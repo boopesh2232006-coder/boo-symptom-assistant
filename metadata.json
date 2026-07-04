@@ -1,0 +1,6 @@
+{
+  "name": "BOO Symptom Assistant",
+  "description": "Best Optimized Online Healthcare Assistant - an advanced medical symptom analysis, triage, and educational healthcare guidance platform.",
+  "requestFramePermissions": ["geolocation"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
