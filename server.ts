@@ -12,14 +12,20 @@ app.use(express.json());
 const PORT = 3000;
 
 // Initialize Google GenAI client securely on server side
-const ai = new GoogleGenAI({
-  apiKey: process.env.GEMINI_API_KEY,
-  httpOptions: {
-    headers: {
-      "User-Agent": "aistudio-build",
-    },
-  },
-});
+let aiInstance: GoogleGenAI | null = null;
+function getGoogleGenAI(): GoogleGenAI {
+  if (!aiInstance) {
+    aiInstance = new GoogleGenAI({
+      apiKey: process.env.GEMINI_API_KEY,
+      httpOptions: {
+        headers: {
+          "User-Agent": "aistudio-build",
+        },
+      },
+    });
+  }
+  return aiInstance;
+}
 
 // System instruction for BOO
 const SYSTEM_INSTRUCTION = `You are BOO (Best Optimized Online Healthcare Assistant), an advanced AI-powered medical symptom analysis assistant designed to provide educational health information.
@@ -113,6 +119,284 @@ app.post("/api/chat", async (req, res) => {
         recommendedHomeCare = ["Sit down and rest in a comfortable position", "Loosen tight clothing", "Try to stay calm"];
         preventiveMeasures = ["Regular cardiac screening", "Manage blood pressure and cholesterol", "Avoid strenuous physical activity until cleared by a doctor"];
         recommendedSpecialist = "Cardiologist / Emergency Medicine Specialist";
+      } else if (lastMsgLower.includes("headache") || lastMsgLower.includes("migraine") || lastMsgLower.includes("dizzy")) {
+        message = `Based on your described symptoms of headache or migraine, here is some educational guidance. Headaches are frequently benign but can indicate stress, hydration issues, or vascular spasm.${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Migraine Headache Disorder",
+            probabilityCategory: "Moderate Probability",
+            reasoning: "Unilateral or throbbing headache patterns often align with migraine pathophysiology.",
+            supportingSymptoms: ["Headache", "Dizziness"],
+            conflictingSymptoms: [],
+            confidencePercentage: 75,
+            complicationsIfUntreated: "Chronic migraine progression, severe cognitive disruption.",
+            recommendedAction: "Rest in a quiet, dark room and consult a PCP if symptoms worsen.",
+          }
+        ];
+        educationalMedicines = [
+          {
+            name: "Ibuprofen (Advil)",
+            category: "NSAID (Non-steroidal anti-inflammatory drug)",
+            type: "Over-the-Counter",
+            commonUses: "Reduction of swelling, pain relief, and fever reduction.",
+            mechanismOfAction: "Inhibits cyclooxygenase (COX) enzymes to prevent prostaglandin synthesis.",
+            commonAdultDosageRange: "200mg to 400mg every 4-6 hours as needed (not to exceed 1,200mg per 24 hours).",
+            commonSideEffects: ["Stomach upset", "Heartburn", "Mild dizziness"],
+            seriousSideEffects: ["Gastrointestinal bleeding", "Kidney impairment"],
+            contraindications: ["Active stomach ulcers", "Severe kidney disease"],
+            drugInteractions: ["Aspirin", "Warfarin (increases bleeding risk)", "Lisinopril"],
+            storageInstructions: "Store in a dry place at room temperature.",
+            precautions: "Take with food to minimize GI distress. Do not use in late pregnancy."
+          }
+        ];
+        recommendedHomeCare = ["Apply a cold compress to your forehead", "Stay hydrated", "Avoid bright screens and loud noises"];
+        preventiveMeasures = ["Maintain a consistent sleep schedule", "Reduce caffeine intake", "Track headache triggers in a diary"];
+        recommendedSpecialist = "Neurologist";
+      } else if (lastMsgLower.includes("sugar") || lastMsgLower.includes("diabetes") || lastMsgLower.includes("glucose")) {
+        message = `Based on your mention of blood sugar or diabetes indicators, this guide offers educational context. Proper metabolic management is essential for long-term health.${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Diabetes Mellitus Type 2",
+            probabilityCategory: "High Probability",
+            reasoning: "Elevated blood sugar levels suggest insulin resistance or relative insulin deficiency.",
+            supportingSymptoms: ["High glucose levels"],
+            conflictingSymptoms: [],
+            confidencePercentage: 80,
+            complicationsIfUntreated: "Neuropathy, retinopathy, renal failure, cardiovascular disease.",
+            recommendedAction: "Schedule a comprehensive evaluation with an Endocrinologist.",
+          }
+        ];
+        educationalMedicines = [
+          {
+            name: "Metformin (Glucophage)",
+            category: "Biguanide (Antidiabetic)",
+            type: "Prescription",
+            commonUses: "Improving glycemic control in adults with type 2 diabetes mellitus.",
+            mechanismOfAction: "Decreases hepatic glucose production and increases peripheral insulin sensitivity.",
+            commonAdultDosageRange: "500mg to 1,000mg twice daily with meals (maximum 2,550mg/day).",
+            commonSideEffects: ["Diarrhea", "Nausea", "Abdominal discomfort"],
+            seriousSideEffects: ["Lactic acidosis (rare but life-threatening)"],
+            contraindications: ["Severe renal impairment (eGFR < 30 mL/min)", "Acute metabolic acidosis"],
+            drugInteractions: ["Contrast dye", "Cimetidine"],
+            storageInstructions: "Store at room temperature (15-30°C).",
+            precautions: "Avoid excessive alcohol. Discard prior to contrast-imaging procedures."
+          }
+        ];
+        recommendedHomeCare = ["Follow a low-glycemic diet", "Engage in moderate aerobic exercise", "Regularly monitor blood glucose levels"];
+        preventiveMeasures = ["Schedule annual eye and kidney exams", "Maintain healthy weight", "Aesthetic screening of diabetic feet"];
+        recommendedSpecialist = "Endocrinologist";
+      } else if (lastMsgLower.includes("pressure") || lastMsgLower.includes("hypertension") || lastMsgLower.includes("bp")) {
+        message = `Based on your mention of high blood pressure, here is educational guidance. Maintaining optimal systolic and diastolic pressure limits vascular fatigue.${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Primary Arterial Hypertension",
+            probabilityCategory: "High Probability",
+            reasoning: "Elevated systemic blood pressure readings meet clinical criteria for hypertension.",
+            supportingSymptoms: ["High blood pressure readings"],
+            conflictingSymptoms: [],
+            confidencePercentage: 85,
+            complicationsIfUntreated: "Stroke, myocardial infarction, congestive heart failure, chronic kidney disease.",
+            recommendedAction: "Review daily blood pressure logs with a Primary Care Physician.",
+          }
+        ];
+        educationalMedicines = [
+          {
+            name: "Lisinopril (Zestril)",
+            category: "ACE Inhibitor (Antihypertensive)",
+            type: "Prescription",
+            commonUses: "Treatment of hypertension and heart failure; improves survival post-MI.",
+            mechanismOfAction: "Inhibits angiotensin-converting enzyme, preventing vasoconstriction and aldosterone release.",
+            commonAdultDosageRange: "10mg to 40mg once daily.",
+            commonSideEffects: ["Dry cough", "Dizziness", "Headache"],
+            seriousSideEffects: ["Angioedema (swelling of face/throat)", "Hyperkalemia"],
+            contraindications: ["History of angioedema", "Pregnancy (causes fetal toxicity)"],
+            drugInteractions: ["Spironolactone (increases potassium)", "NSAIDs (reduces efficacy)"],
+            storageInstructions: "Store at room temperature away from moisture.",
+            precautions: "Monitor kidney function and serum potassium levels regularly."
+          }
+        ];
+        recommendedHomeCare = ["Reduce daily sodium intake (< 2,300mg/day)", "Manage stress through deep breathing", "Limit alcohol and caffeine intake"];
+        preventiveMeasures = ["Get 150 minutes of moderate aerobic exercise weekly", "Maintain a DASH-based diet plan", "Regular BP self-monitoring"];
+        recommendedSpecialist = "Cardiologist";
+      } else if (lastMsgLower.includes("stomach") || lastMsgLower.includes("abdominal") || lastMsgLower.includes("acid") || lastMsgLower.includes("heartburn")) {
+        message = `Based on your gastrointestinal symptoms like stomach pain or acid reflux, here is some educational guidance. These symptoms are common in gastroduodenal irritation or acid reflux.${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Gastroesophageal Reflux Disease (GERD) / Gastritis",
+            probabilityCategory: "High Probability",
+            reasoning: "Upper abdominal burning or reflux symptoms frequently align with gastric acid hypersecretion.",
+            supportingSymptoms: ["Stomach pain", "Heartburn"],
+            conflictingSymptoms: [],
+            confidencePercentage: 85,
+            complicationsIfUntreated: "Esophageal stricture, Barrett's esophagus, peptic ulcer disease.",
+            recommendedAction: "Avoid lying down immediately after meals and consult a gastroenterologist.",
+          }
+        ];
+        educationalMedicines = [
+          {
+            name: "Omeprazole (Prilosec)",
+            category: "Proton Pump Inhibitor (Acid Reducer)",
+            type: "Over-the-Counter",
+            commonUses: "Treatment of frequent heartburn, acid reflux, and gastric irritation.",
+            mechanismOfAction: "Suppresses gastric acid secretion by specific inhibition of the H+/K+-ATPase enzyme system.",
+            commonAdultDosageRange: "20mg once daily, 30-60 minutes before breakfast.",
+            commonSideEffects: ["Headache", "Abdominal pain", "Mild diarrhea"],
+            seriousSideEffects: ["Clostridioides difficile-associated diarrhea", "Bone fractures (long-term use)"],
+            contraindications: ["Hypersensitivity to omeprazole"],
+            drugInteractions: ["Clopidogrel", "Ketoconazole"],
+            storageInstructions: "Store in a tightly closed container at room temperature.",
+            precautions: "Do not crush or chew capsules. Consult a doctor for prolonged use."
+          }
+        ];
+        recommendedHomeCare = ["Avoid spicy, fatty, and acidic foods", "Eat smaller meals more frequently", "Elevate the head of your bed by 6 inches"];
+        preventiveMeasures = ["Do not eat within 3 hours of sleeping", "Manage body weight", "Limit caffeine and carbonated beverage intake"];
+        recommendedSpecialist = "Gastroenterologist";
+      } else if (lastMsgLower.includes("diarrhea") || lastMsgLower.includes("vomit") || lastMsgLower.includes("dehydration") || lastMsgLower.includes("loose stools")) {
+        message = `Based on your symptoms of loose stools or vomiting, preventing dehydration is the primary clinical objective. These symptoms are typical in acute gastroenteritis.${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Acute Viral Gastroenteritis / Food Poisoning",
+            probabilityCategory: "High Probability",
+            reasoning: "Sudden onset of vomiting and watery diarrhea indicates acute gastrointestinal inflammation.",
+            supportingSymptoms: ["Diarrhea", "Vomiting"],
+            conflictingSymptoms: [],
+            confidencePercentage: 90,
+            complicationsIfUntreated: "Severe dehydration, hypovolemic shock, electrolyte imbalance.",
+            recommendedAction: "Focus on fluid replacement and seek immediate care if you cannot retain fluids.",
+          }
+        ];
+        educationalMedicines = [
+          {
+            name: "Oral Rehydration Salts (ORS)",
+            category: "Electrolyte Replacer",
+            type: "Over-the-Counter",
+            commonUses: "Prevention and treatment of dehydration due to diarrhea and vomiting.",
+            mechanismOfAction: "Utilizes sodium-glucose cotransporters in the small intestine to maximize water absorption.",
+            commonAdultDosageRange: "Dissolve 1 packet in 1 Liter of clean water; drink 200-400ml after each loose motion.",
+            commonSideEffects: ["Nausea (if consumed too quickly)"],
+            seriousSideEffects: ["Hypernatremia (extremely rare if prepared correctly)"],
+            contraindications: ["Intestinal obstruction", "Severe kidney failure"],
+            drugInteractions: ["None significant"],
+            storageInstructions: "Store packets in dry room temperature. Consume mixed solution within 24 hours.",
+            precautions: "Always dissolve in the exact amount of water specified. Do not boil the prepared solution."
+          },
+          {
+            name: "Loperamide (Imodium)",
+            category: "Antidiarrheal Agent",
+            type: "Over-the-Counter",
+            commonUses: "Symptomatic control of acute diarrhea.",
+            mechanismOfAction: "Slows intestinal motility by binding to opiate receptors on the gut wall, allowing more water absorption.",
+            commonAdultDosageRange: "4mg initially, followed by 2mg after each loose stool (not to exceed 8mg/day for OTC use).",
+            commonSideEffects: ["Constipation", "Abdominal cramping", "Dizziness"],
+            seriousSideEffects: ["Toxic megacolon", "QT prolongation / Cardiac events (at high doses)"],
+            contraindications: ["Infectious diarrhea (with high fever or bloody stool)", "Ulcerative colitis"],
+            drugInteractions: ["Ketoconazole", "Ritonavir"],
+            storageInstructions: "Store at room temperature.",
+            precautions: "Do not use if diarrhea is bacterial/parasitic (indicated by blood/mucus or high fever) as slowing motility traps the pathogen."
+          }
+        ];
+        recommendedHomeCare = ["Drink ORS solution in small, frequent sips", "Follow a bland BRAT diet once vomiting stops", "Rest and avoid dairy, juices, and caffeine"];
+        preventiveMeasures = ["Practice strict hand hygiene before eating", "Ensure proper cooking and refrigeration of food", "Avoid drinking untreated water"];
+        recommendedSpecialist = "Primary Care Physician (PCP) / Gastroenterologist";
+      } else if (lastMsgLower.includes("allergy") || lastMsgLower.includes("rash") || lastMsgLower.includes("itching") || lastMsgLower.includes("sneeze")) {
+        message = `Based on your symptoms of rash, itching, or sneezing, here is educational guidance. Allergic responses result from hypersensitive immune reactions to foreign substances.${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Allergic Rhinitis / Urticaria",
+            probabilityCategory: "High Probability",
+            reasoning: "Pruritus (itching), sneezing, and skin rashes are typical manifestations of histamine release.",
+            supportingSymptoms: ["Itching", "Sneezing", "Rash"],
+            conflictingSymptoms: [],
+            confidencePercentage: 85,
+            complicationsIfUntreated: "Chronic dermatitis, secondary skin infections from scratching, asthma exacerbation.",
+            recommendedAction: "Identify and avoid suspected allergens; consult a doctor for allergy testing.",
+          }
+        ];
+        educationalMedicines = [
+          {
+            name: "Cetirizine (Zyrtec)",
+            category: "Antihistamine (H1 Receptor Antagonist)",
+            type: "Over-the-Counter",
+            commonUses: "Relief of allergy symptoms such as sneezing, runny nose, itchy eyes, and hives.",
+            mechanismOfAction: "Selectively inhibits peripheral histamine H1 receptors, blocking histamine activity.",
+            commonAdultDosageRange: "5mg to 10mg once daily.",
+            commonSideEffects: ["Drowsiness", "Dry mouth", "Fatigue"],
+            seriousSideEffects: ["Severe allergic reaction (anaphylaxis) - rare"],
+            contraindications: ["Hypersensitivity to cetirizine or hydroxyzine"],
+            drugInteractions: ["Alcohol (increases drowsiness)", "Sedatives"],
+            storageInstructions: "Store at room temperature.",
+            precautions: "Use caution when driving or operating machinery as it may cause mild drowsiness."
+          }
+        ];
+        recommendedHomeCare = ["Use a cool, damp compress on itchy skin", "Avoid hot showers which worsen hives", "Keep indoor windows closed during high pollen seasons"];
+        preventiveMeasures = ["Vacuum carpets and wash bed linens regularly", "Use hypoallergenic bedding covers", "Bathe pets weekly to reduce dander"];
+        recommendedSpecialist = "Allergist / Immunologist";
+      } else if (lastMsgLower.includes("asthma") || lastMsgLower.includes("wheez") || lastMsgLower.includes("breath")) {
+        message = `Based on your breathing complaints or wheezing, here is educational guidance. Airway hyper-responsiveness can constrict lung capacity.${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Mild Bronchospasm / Asthma Exacerbation",
+            probabilityCategory: "Moderate Probability",
+            reasoning: "Wheezing and shortness of breath point toward reversible lower airway obstruction.",
+            supportingSymptoms: ["Wheezing", "Breathing difficulty"],
+            conflictingSymptoms: [],
+            confidencePercentage: 80,
+            complicationsIfUntreated: "Severe respiratory distress, hypoxemia, respiratory failure.",
+            recommendedAction: "Use prescribed rescue inhalers immediately and seek emergency care if distress worsens.",
+          }
+        ];
+        educationalMedicines = [
+          {
+            name: "Albuterol (ProAir)",
+            category: "Beta-2 Agonist (Bronchodilator)",
+            type: "Prescription",
+            commonUses: "Quick relief of bronchospasm in patients with asthma or COPD.",
+            mechanismOfAction: "Relaxes bronchial smooth muscle by stimulating beta-2 adrenergic receptors.",
+            commonAdultDosageRange: "1 to 2 inhalations (90mcg/puff) every 4-6 hours as needed.",
+            commonSideEffects: ["Tremor", "Nervousness", "Rapid heart rate (tachycardia)"],
+            seriousSideEffects: ["Paradoxical bronchospasm", "Hypokalemia"],
+            contraindications: ["Hypersensitivity to albuterol"],
+            drugInteractions: ["Beta-blockers (antagonize albuterol)", "Diuretics"],
+            storageInstructions: "Store at room temperature; do not expose to extreme heat or puncture.",
+            precautions: "Ensure proper inhaler spacer technique. Seek immediate help if rescue dose fails to work."
+          }
+        ];
+        recommendedHomeCare = ["Sit upright and attempt slow, deep breathing", "Remain calm (anxiety constricts airways)", "Ensure room air is humidified or free of dust"];
+        preventiveMeasures = ["Avoid tobacco smoke, strong fumes, and cold air", "Receive annual flu and pneumococcal vaccines", "Use a peak flow meter to monitor lung volumes daily"];
+        recommendedSpecialist = "Pulmonologist";
+      } else if (lastMsgLower.includes("urination") || lastMsgLower.includes("urine") || lastMsgLower.includes("burning")) {
+        message = `Based on your symptoms of burning or painful urination, here is educational guidance. Lower urinary tract irritation is frequently bacterial in nature.${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Acute Uncomplicated Urinary Tract Infection (UTI)",
+            probabilityCategory: "High Probability",
+            reasoning: "Dysuria (burning urination) and increased frequency are primary indicators of bladder wall inflammation.",
+            supportingSymptoms: ["Burning urination", "Urinary frequency"],
+            conflictingSymptoms: [],
+            confidencePercentage: 90,
+            complicationsIfUntreated: "Pyelonephritis (kidney infection), urosepsis.",
+            recommendedAction: "Consult a healthcare provider for a urinalysis and appropriate antibiotic prescription.",
+          }
+        ];
+        educationalMedicines = [
+          {
+            name: "Ciprofloxacin (Cipro)",
+            category: "Fluoroquinolone Antibiotic",
+            type: "Prescription",
+            commonUses: "Treatment of bacterial infections, including urinary tract infections.",
+            mechanismOfAction: "Inhibits bacterial DNA gyrase and topoisomerase IV, stopping bacterial replication.",
+            commonAdultDosageRange: "250mg to 500mg twice daily for 3 days (for simple cystitis).",
+            commonSideEffects: ["Nausea", "Diarrhea", "Headache"],
+            seriousSideEffects: ["Tendon rupture or tendinitis", "QT prolongation", "Peripheral neuropathy"],
+            contraindications: ["Concurrent tizanidine use", "History of tendon disorders"],
+            drugInteractions: ["Antacids (reduces absorption)", "Dairy products", "Theophylline"],
+            storageInstructions: "Store at room temperature in a dry place.",
+            precautions: "Drink plenty of water. Avoid direct sunlight. Complete the entire course of therapy."
+          }
+        ];
+        recommendedHomeCare = ["Increase water intake significantly to flush the bladder", "Apply a heating pad to the pelvic area to relieve pressure", "Avoid bladder irritants like coffee, alcohol, and spicy foods"];
+        preventiveMeasures = ["Urinate immediately following sexual intercourse", "Wipe from front to back after using the restroom", "Avoid holding urine for extended periods"];
+        recommendedSpecialist = "Urologist";
       } else if (lastMsgLower.includes("fever") || lastMsgLower.includes("cough") || lastMsgLower.includes("cold") || lastMsgLower.includes("throat")) {
         message = `Based on your described symptoms of fever or cough, here is some educational guidance to help monitor your symptoms. This combination is common in upper respiratory pathology.${disclaimer}`;
         possibleConditions = [
@@ -145,6 +429,7 @@ app.post("/api/chat", async (req, res) => {
         ];
         recommendedHomeCare = ["Maintain hydration (warm teas, water)", "Adequate bed rest", "Use saline throat sprays or throat lozenges"];
         preventiveMeasures = ["Frequent handwashing", "Get the annual influenza vaccine", "Avoid contact with sick individuals"];
+        recommendedSpecialist = "Primary Care Physician (PCP)";
       } else {
         message = `Welcome to BOO. I am listening to your health concerns. Please share more details about your symptoms, such as their duration, pain intensity (on a scale of 1-10), and if you have any other relevant health history.${disclaimer}`;
       }
@@ -214,7 +499,7 @@ app.post("/api/chat", async (req, res) => {
     });
 
     // Request content generation with a strict JSON schema matching BOO's requirements
-    const response = await ai.models.generateContent({
+    const response = await getGoogleGenAI().models.generateContent({
       model: "gemini-3.5-flash",
       contents: contents,
       config: {
@@ -386,9 +671,22 @@ async function startServer() {
     console.log("Static files served from", distPath);
   }
 
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`BOO backend server is running on http://localhost:${PORT}`);
-  });
+  function startListen(portToTry: number) {
+    const serverInstance = app.listen(portToTry, "0.0.0.0", () => {
+      console.log(`BOO backend server is running on http://localhost:${portToTry}`);
+    });
+
+    serverInstance.on("error", (err: any) => {
+      if (err.code === "EADDRINUSE") {
+        console.warn(`Port ${portToTry} is already in use. Retrying on port ${portToTry + 1}...`);
+        startListen(portToTry + 1);
+      } else {
+        console.error("Server error:", err);
+      }
+    });
+  }
+
+  startListen(PORT);
 }
 
 startServer();

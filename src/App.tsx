@@ -205,7 +205,7 @@ export default function App() {
           } else if (errData.error) {
             errMsg = errData.error;
           }
-        } catch (_) {}
+        } catch (_) { }
         throw new Error(errMsg);
       }
 
@@ -319,12 +319,12 @@ export default function App() {
     } catch (e) {
       console.error(e);
     }
-    
+
     setLanguage("en");
     setTextSize("md");
     setTheme("light");
     setShowWelcome(true);
-    
+
     const fresh = createNewBlankSession();
     setSessions([fresh]);
     setActiveSessionId(fresh.id);
@@ -380,11 +380,11 @@ export default function App() {
   // Set visual theme custom colors dynamically
   const isDark = theme === "dark";
   const isSlate = theme === "slate";
-  const bgClass = isDark 
-    ? "bg-slate-950 text-slate-150 dark" 
-    : isSlate 
-    ? "bg-slate-100/95 text-slate-800" 
-    : "bg-slate-50/50 text-slate-800";
+  const bgClass = isDark
+    ? "bg-slate-950 text-slate-150 dark"
+    : isSlate
+      ? "bg-slate-100/95 text-slate-800"
+      : "bg-slate-50/50 text-slate-800";
 
   return (
     <div className={`min-h-screen ${bgClass} flex flex-col antialiased font-sans text-size-${textSize}`}>

@@ -82,7 +82,18 @@ export interface HospitalFacility {
   name: string;
   type: string;
   lat: number;
-  lon: number;
+  lng: number; // aligned with HospitalLocator
   distance?: number;
   address?: string;
+  phoneNumber?: string;
+  rating?: number;
+  userRatingCount?: number;
+  isOpenNow?: boolean;
+  traumaLevel?: string;
+  erWaitTime?: string;
+  icuBedsAvailable?: number;
+  specialtyService?: string;
+  region?: string;
+  place?: string;
+  facilities?: string[];
 }

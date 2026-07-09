@@ -3,6 +3,9 @@ import { ChatSession, ExtractedData } from "../types";
 import { LocationFinder } from "./LocationFinder";
 import { HospitalLocator } from "./HospitalLocator";
 import { HistoryPanel } from "./HistoryPanel";
+import { MedicationScheduler } from "./MedicationScheduler";
+import { InteractionChecker } from "./InteractionChecker";
+import { SymptomTracker } from "./SymptomTracker";
 import { TRANSLATIONS, LanguageCode } from "../lib/translations";
 import { COUNTRIES, Country, parsePhoneNumber } from "../lib/countries";
 import {
@@ -25,7 +28,8 @@ import {
   Compass,
   Check,
   Pencil,
-  Building2
+  Building2,
+  Printer
 } from "lucide-react";
 
 interface PatientCaseFileProps {
@@ -40,6 +44,180 @@ interface PatientCaseFileProps {
   onUpdateSessions?: (updated: ChatSession[]) => void;
   language?: LanguageCode;
 }
+
+interface MasterMedicine {
+  name: string;
+  category: string;
+  type: string;
+  commonUses: string;
+  mechanismOfAction: string;
+  commonAdultDosageRange: string;
+  pediatricDosage: string;
+  adultDosage: string;
+  geriatricDosage: string;
+  commonSideEffects: string[];
+  seriousSideEffects: string[];
+  contraindications: string[];
+  storageInstructions: string;
+  precautions: string;
+  symptoms: string[];
+}
+
+const MASTER_MEDICINE_DATABASE: MasterMedicine[] = [
+  {
+    name: "Acetaminophen (Tylenol)",
+    category: "Analgesic & Antipyretic",
+    type: "Over-the-Counter",
+    commonUses: "Temporary relief of minor aches, pains, headaches, and reduction of fever.",
+    mechanismOfAction: "Inhibits prostaglandin synthesis in the central nervous system to block pain and fever pathways.",
+    commonAdultDosageRange: "325mg to 650mg every 4-6 hours as needed (do not exceed 3,000mg per 24 hours).",
+    pediatricDosage: "10-15 mg/kg body weight per dose every 4-6 hours (maximum 5 doses per 24 hours). Avoid in infants under 12 weeks unless specified by a pediatrician.",
+    adultDosage: "325mg to 650mg every 4-6 hours as needed, or 1000mg every 6 hours (do not exceed 3,000mg to 4,000mg per 24 hours).",
+    geriatricDosage: "Consider a lower maximum daily limit (e.g. 2,000mg to 2,500mg) due to potential hepatic decline or chronic kidney disease.",
+    commonSideEffects: ["Nausea", "Headache"],
+    seriousSideEffects: ["Severe liver damage (hepatotoxicity) if daily limit is exceeded", "Severe allergic skin reactions"],
+    contraindications: ["Severe liver impairment", "Known allergy to acetaminophen"],
+    storageInstructions: "Store at room temperature in a dry place.",
+    precautions: "Consult a doctor if you have liver disease. Avoid using other products containing acetaminophen simultaneously.",
+    symptoms: ["fever", "pain", "headache", "cold", "flu", "cough"]
+  },
+  {
+    name: "Ibuprofen (Advil / Motrin)",
+    category: "NSAID (Non-steroidal anti-inflammatory drug)",
+    type: "Over-the-Counter",
+    commonUses: "Reduction of inflammation, swelling, fever, and relief of acute body or muscle pain.",
+    mechanismOfAction: "Inhibits cyclooxygenase (COX-1 and COX-2) enzymes, preventing prostaglandin production.",
+    commonAdultDosageRange: "200mg to 400mg every 4-6 hours with food as needed (maximum 1,200mg/day for OTC use).",
+    pediatricDosage: "5-10 mg/kg body weight per dose every 6-8 hours with food (maximum 40 mg/kg/day). Avoid in infants under 6 months.",
+    adultDosage: "200mg to 400mg every 4-6 hours with food as needed, or up to 800mg every 8 hours for prescription-strength anti-inflammatory use (max 3,200mg/day).",
+    geriatricDosage: "Use lowest effective dose for shortest duration; high risk of gastrointestinal bleeding/ulceration and renal impairment. Monitor renal function.",
+    commonSideEffects: ["Stomach upset", "Heartburn", "Mild dizziness"],
+    seriousSideEffects: ["Gastrointestinal bleeding/ulcers", "Increased cardiovascular event risk", "Kidney dysfunction"],
+    contraindications: ["Active stomach ulcers", "Severe kidney disease", "Post-heart bypass surgery"],
+    storageInstructions: "Store at room temperature in a dry place.",
+    precautions: "Always take with food to protect the stomach lining. Do not use in late pregnancy.",
+    symptoms: ["pain", "headache", "migraine", "fever", "joint pain", "muscle pain", "back pain", "toothache", "inflammation"]
+  },
+  {
+    name: "Omeprazole (Prilosec)",
+    category: "Proton Pump Inhibitor (Acid Reducer)",
+    type: "Over-the-Counter / Prescription",
+    commonUses: "Heartburn, acid reflux, GERD, and healing of stomach ulcers.",
+    mechanismOfAction: "Suppresses gastric acid secretion by blocking the H+/K+-ATPase proton pump in parietal cells.",
+    commonAdultDosageRange: "20mg once daily, 30-60 minutes before breakfast, for up to 14 days.",
+    pediatricDosage: "10mg to 20mg once daily (for children > 1 year and above 10kg, under pediatrician supervision).",
+    adultDosage: "20mg once daily before breakfast (for GERD/heartburn), or up to 40mg once daily for active erosive esophagitis.",
+    geriatricDosage: "Generally same as adult dosage; monitor for bone density reduction and calcium/magnesium malabsorption during prolonged use.",
+    commonSideEffects: ["Headache", "Abdominal pain", "Mild diarrhea", "Flatulence"],
+    seriousSideEffects: ["Clostridioides difficile-associated diarrhea", "Kidney inflammation", "Bone fractures (long-term use)"],
+    contraindications: ["Hypersensitivity to proton pump inhibitors"],
+    storageInstructions: "Store at room temperature away from moisture.",
+    precautions: "Do not crush or chew capsules. Seek medical review if heartburn persists for more than 2 weeks.",
+    symptoms: ["acid reflux", "heartburn", "stomach pain", "indigestion", "gerd", "acidity", "gastritis"]
+  },
+  {
+    name: "Cetirizine (Zyrtec)",
+    category: "Antihistamine (H1 Receptor Antagonist)",
+    type: "Over-the-Counter",
+    commonUses: "Relief of allergy symptoms, sneezing, runny nose, itchy watery eyes, and hives.",
+    mechanismOfAction: "Selectively blocks peripheral H1 histamine receptors to prevent allergic cascade.",
+    commonAdultDosageRange: "5mg to 10mg once daily.",
+    pediatricDosage: "2.5mg once daily (ages 2-5 years); 5mg to 10mg once daily (ages 6 years and older). Do not use under 2 years unless prescribed.",
+    adultDosage: "5mg to 10mg once daily depending on symptom severity.",
+    geriatricDosage: "Start at 5mg once daily; clearance may be reduced in seniors with renal impairment. Monitor for mild drowsiness.",
+    commonSideEffects: ["Drowsiness", "Dry mouth", "Fatigue"],
+    seriousSideEffects: ["Severe allergic reactions (anaphylaxis) - rare"],
+    contraindications: ["Allergy to cetirizine or hydroxyzine"],
+    storageInstructions: "Store at room temperature.",
+    precautions: "May cause mild drowsiness; avoid driving or operating heavy machinery until you know how it affects you.",
+    symptoms: ["allergy", "rash", "itching", "sneezing", "runny nose", "watery eyes", "hives"]
+  },
+  {
+    name: "Albuterol (ProAir / Ventolin)",
+    category: "Beta-2 Agonist (Bronchodilator)",
+    type: "Prescription",
+    commonUses: "Quick relief of wheezing, chest tightness, and shortness of breath in asthma or COPD.",
+    mechanismOfAction: "Stimulates beta-2 adrenergic receptors, relaxing bronchial smooth muscle and dilating airways.",
+    commonAdultDosageRange: "1 to 2 inhalations (90mcg/puff) every 4-6 hours as needed for wheezing.",
+    pediatricDosage: "1 to 2 inhalations (90mcg/puff) every 4-6 hours as needed, under adult supervision. Spacers are recommended for infants.",
+    adultDosage: "1 to 2 inhalations (90mcg/puff) every 4-6 hours as needed for bronchospasm, or 2 inhalations 15-30 minutes before exercise.",
+    geriatricDosage: "Same as adult; monitor closely for increased heart rate, tremors, palpitations, or arrhythmias in senior patients.",
+    commonSideEffects: ["Nervousness", "Muscle tremors", "Increased heart rate (tachycardia)"],
+    seriousSideEffects: ["Paradoxical bronchospasm (airways closing)", "Hypokalemia"],
+    contraindications: ["Hypersensitivity to albuterol or milk proteins (for some dry powder inhalers)"],
+    storageInstructions: "Store at room temperature; keep away from flame or extreme heat.",
+    precautions: "Carry your rescue inhaler at all times. Seek immediate emergency care if rescue inhaler fails to relieve breathing distress.",
+    symptoms: ["asthma", "wheezing", "shortness of breath", "cough", "copd", "breathing difficulty"]
+  },
+  {
+    name: "Metformin (Glucophage)",
+    category: "Antidiabetic (Biguanide)",
+    type: "Prescription",
+    commonUses: "First-line oral management of Type 2 Diabetes Mellitus to lower blood glucose.",
+    mechanismOfAction: "Decreases hepatic glucose output, decreases intestinal glucose absorption, and improves insulin sensitivity.",
+    commonAdultDosageRange: "500mg to 1000mg twice daily with meals (maximum 2,550mg/day).",
+    pediatricDosage: "Start at 500mg once daily (ages 10+ years); maximum 2,000mg/day. Safety not established for children under 10 years.",
+    adultDosage: "500mg to 1000mg twice daily with meals, or 850mg once daily (maximum 2,550mg/day for immediate-release).",
+    geriatricDosage: "Start at a lower dose (e.g. 500mg/day) to minimize GI side effects. Adjust based on eGFR renal function (avoid if eGFR < 30 mL/min).",
+    commonSideEffects: ["Diarrhea", "Nausea", "Metallic taste", "Abdominal discomfort"],
+    seriousSideEffects: ["Lactic acidosis (rare but critical metabolic emergency)"],
+    contraindications: ["Severe kidney disease (eGFR < 30 mL/min)", "Acute or chronic metabolic acidosis"],
+    storageInstructions: "Store at room temperature.",
+    precautions: "Limit alcohol intake to reduce lactic acidosis risk. Hold medication prior to contrast imaging scans.",
+    symptoms: ["diabetes", "high blood sugar", "high glucose"]
+  },
+  {
+    name: "Lisinopril (Zestril)",
+    category: "ACE Inhibitor (Antihypertensive)",
+    type: "Prescription",
+    commonUses: "Treatment of high blood pressure (hypertension) and heart failure; improves post-MI survival.",
+    mechanismOfAction: "Inhibits angiotensin-converting enzyme, preventing angiotensin II vasoconstriction.",
+    commonAdultDosageRange: "10mg to 40mg once daily.",
+    pediatricDosage: "0.07 mg/kg once daily (ages 6 years and older; maximum starting dose 5mg). Adjust based on blood pressure response.",
+    adultDosage: "10mg once daily starting dose, maintenance dose range is 10mg to 40mg once daily.",
+    geriatricDosage: "Start at a lower dose (e.g. 5mg once daily) due to increased sensitivity and potential renal decline. Monitor potassium levels.",
+    commonSideEffects: ["Dry cough", "Dizziness", "Headache", "Fatigue"],
+    seriousSideEffects: ["Angioedema (swelling of face, lips, tongue, or airway)", "Hyperkalemia"],
+    contraindications: ["History of angioedema", "Pregnancy (known to cause fetal injury or death)"],
+    storageInstructions: "Store at room temperature away from moisture.",
+    precautions: "A dry cough is a common side effect; contact your doctor to switch meds if it is bothersome. Avoid potassium supplements.",
+    symptoms: ["high blood pressure", "hypertension", "heart failure"]
+  },
+  {
+    name: "Ciprofloxacin (Cipro)",
+    category: "Fluoroquinolone Antibiotic",
+    type: "Prescription",
+    commonUses: "Treatment of bacterial urinary tract infections (UTIs) and prostate infections.",
+    mechanismOfAction: "Inhibits bacterial DNA gyrase and topoisomerase IV enzymes, preventing DNA replication.",
+    commonAdultDosageRange: "250mg to 500mg twice daily for 3 to 7 days.",
+    pediatricDosage: "Generally avoided due to arthropathy risk, unless for complicated UTIs or anthrax exposure (10-20 mg/kg every 12 hours).",
+    adultDosage: "250mg to 500mg twice daily for 3 to 7 days for acute uncomplicated UTI, or up to 750mg twice daily for severe bone/joint infections.",
+    geriatricDosage: "Adjust dose based on renal function (creatinine clearance); monitor for central nervous system side effects (delirium, confusion) and tendonitis.",
+    commonSideEffects: ["Nausea", "Diarrhea", "Headache", "Vomiting"],
+    seriousSideEffects: ["Tendon rupture or tendinitis", "QT cardiac interval prolongation", "Severe nerve pain (neuropathy)"],
+    contraindications: ["Concurrent tizanidine administration", "History of fluoroquinolone-induced tendon damage"],
+    storageInstructions: "Store at room temperature in a dry place.",
+    precautions: "Drink plenty of water. Avoid taking with dairy or antacids containing calcium/magnesium. Complete the entire course.",
+    symptoms: ["uti", "burning urination", "urinary infection", "bacterial infection"]
+  },
+  {
+    name: "Oral Rehydration Salts (ORS)",
+    category: "Electrolyte Replacer",
+    type: "Over-the-Counter",
+    commonUses: "Rehydration and electrolyte replenishment during active diarrhea and vomiting.",
+    mechanismOfAction: "Utilizes sodium-glucose cotransporters in intestinal mucosal cells to maximize water absorption.",
+    commonAdultDosageRange: "Dissolve 1 packet in 1 Liter of clean water; sip 200-400ml after every loose stool.",
+    pediatricDosage: "Sip 50-100ml after every loose stool (infants/children should be offered small frequent sips to prevent vomiting).",
+    adultDosage: "Sip 200-400ml after every loose stool; drink freely as hydration requires (approx 2 to 4 Liters per day).",
+    geriatricDosage: "Sip 200-400ml; monitor fluid overload risk in senior patients with congestive heart failure or severe renal failure.",
+    commonSideEffects: ["Nausea if swallowed too quickly"],
+    seriousSideEffects: ["Electrolyte imbalance (only if prepared with incorrect water volume)"],
+    contraindications: ["Intestinal obstruction", "Severe kidney failure"],
+    storageInstructions: "Store in a dry place. Mixed solution must be discarded after 24 hours.",
+    precautions: "Strictly follow dilution volumes. Do not mix with juices or boil the prepared solution.",
+    symptoms: ["diarrhea", "vomiting", "dehydration", "food poisoning", "loose stools"]
+  }
+];
 
 export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
   session,
@@ -60,6 +238,10 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
 
   const [expandedCondition, setExpandedCondition] = useState<string | null>(null);
   const [expandedMedicine, setExpandedMedicine] = useState<string | null>(null);
+  const [medSubTab, setMedSubTab] = useState<"info" | "scheduler" | "interactions">("info");
+  const [symptomSearch, setSymptomSearch] = useState("");
+  const [selectedSymptomTag, setSelectedSymptomTag] = useState<string | null>(null);
+  const [expandedMasterMedicine, setExpandedMasterMedicine] = useState<string | null>(null);
 
   const [isEditingPhone, setIsEditingPhone] = useState(false);
   const [isEditingPlace, setIsEditingPlace] = useState(false);
@@ -247,9 +429,18 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
             <Activity className="w-4 h-4 shrink-0" />
             <span className="text-xs font-bold uppercase tracking-wider">{currentUrgency.badge}</span>
           </div>
-          <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border bg-white dark:bg-slate-900">
-            {t.urgencyLabel}: {urgency}
-          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => window.print()}
+              className="no-print text-[10px] font-bold bg-white hover:bg-slate-50 dark:bg-slate-905 dark:hover:bg-slate-800 text-slate-700 dark:text-slate-300 px-2.5 py-1 rounded-lg border border-slate-250 dark:border-slate-800 flex items-center gap-1 cursor-pointer transition-colors shadow-xs hover:shadow-sm"
+            >
+              <Printer className="w-3.5 h-3.5 text-teal-650" />
+              Print Chart
+            </button>
+            <span className="text-[10px] font-mono font-semibold px-2 py-0.5 rounded-full border bg-white dark:bg-slate-900">
+              {t.urgencyLabel}: {urgency}
+            </span>
+          </div>
         </div>
         <p className="text-[11px] mt-1 opacity-90 leading-relaxed font-medium">{currentUrgency.desc}</p>
       </div>
@@ -785,6 +976,11 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
                   )}
                 </div>
               </div>
+
+              {/* Symptom recovery diary */}
+              <div className="border-t border-slate-150 dark:border-slate-800 pt-4 mt-2">
+                <SymptomTracker session={session} />
+              </div>
             </div>
           </div>
         )}
@@ -968,144 +1164,363 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
         {/* TAB 3: MEDICINES DIRECTORY */}
         {activeTab === "medicines" && (
           <div className="space-y-4">
-            <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">
-              Educational Drug Information Directory ({session.educationalMedicines.length})
-            </h4>
+            {/* Sub Tabs */}
+            <div className="flex border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 rounded-xl p-1 gap-1 no-print">
+              <button
+                onClick={() => setMedSubTab("info")}
+                className={`flex-1 py-1.5 text-center text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                  medSubTab === "info"
+                    ? "bg-white text-teal-600 dark:bg-slate-800 dark:text-teal-400 shadow-xs"
+                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
+                }`}
+              >
+                Pill Cabinet & Info
+              </button>
+              <button
+                onClick={() => setMedSubTab("scheduler")}
+                className={`flex-1 py-1.5 text-center text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                  medSubTab === "scheduler"
+                    ? "bg-white text-teal-600 dark:bg-slate-800 dark:text-teal-400 shadow-xs"
+                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
+                }`}
+              >
+                Pill Scheduler Log
+              </button>
+              <button
+                onClick={() => setMedSubTab("interactions")}
+                className={`flex-1 py-1.5 text-center text-[10px] font-bold rounded-lg transition-all cursor-pointer ${
+                  medSubTab === "interactions"
+                    ? "bg-white text-teal-600 dark:bg-slate-800 dark:text-teal-400 shadow-xs"
+                    : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
+                }`}
+              >
+                Interaction Checker
+              </button>
+            </div>
 
-            {session.educationalMedicines.length === 0 ? (
-              <div className="text-center py-10 bg-slate-50 dark:bg-slate-950 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
-                <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-                  Educational guidance on medicines will display here if discussed during chat, or if related to analyzed symptoms.
-                </p>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                {session.educationalMedicines.map((med, i) => {
-                  const isExpanded = expandedMedicine === med.name;
-                  return (
-                    <div
-                      key={i}
-                      className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-sm transition-all"
-                    >
-                      <button
-                        onClick={() => setExpandedMedicine(isExpanded ? null : med.name)}
-                        className="w-full p-3.5 flex items-start justify-between text-left cursor-pointer"
-                      >
-                        <div className="space-y-1.5 min-w-0 pr-4">
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            <h5 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-tight">
-                              {med.name}
-                            </h5>
-                            <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-600 dark:text-slate-300">
-                              {med.category}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
-                            Uses: {med.commonUses}
-                          </p>
-                        </div>
-                        <div className="flex flex-col items-end shrink-0 justify-between h-full gap-2">
-                          <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${med.type === "Over-the-Counter" ? "bg-teal-50 text-teal-600 dark:bg-teal-950/20" : "bg-purple-50 text-purple-600 dark:bg-purple-950/20"}`}>
-                            {med.type}
-                          </span>
-                          {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
-                        </div>
-                      </button>
+            {medSubTab === "info" && (
+              <div className="space-y-4 animate-fadeIn">
+                {/* Master Lookup UI */}
+                <div className="bg-slate-50 dark:bg-slate-950 p-3.5 rounded-xl border border-slate-200 dark:border-slate-800 space-y-3 no-print">
+                  <div className="flex items-center gap-1.5 pb-1.5 border-b border-slate-200 dark:border-slate-800">
+                    <Pill className="w-4 h-4 text-teal-600 animate-pulse" />
+                    <span className="text-xs font-bold text-slate-800 dark:text-slate-200 uppercase tracking-wider">
+                      Master Medicine Symptom Lookup
+                    </span>
+                  </div>
 
-                      {isExpanded && (
-                        <div className="px-4 pb-4 pt-1.5 border-t border-slate-50 dark:border-slate-950 space-y-3 bg-slate-50/20 dark:bg-slate-950/5">
-                          <div>
-                            <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-                              Mechanism of Action
-                            </span>
-                            <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                              {med.mechanismOfAction}
-                            </p>
-                          </div>
+                  <p className="text-[10px] text-slate-500 dark:text-slate-400">
+                    Search for a symptom or click any quick-tag below to discover master medicine information (dosage, uses, precautions, etc.).
+                  </p>
 
-                          {med.commonAdultDosageRange && (
-                            <div>
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-                                Typical Adult Dosage Range
-                              </span>
-                              <p className="text-xs text-slate-600 dark:text-slate-300 font-semibold">
-                                {med.commonAdultDosageRange}
-                              </p>
-                              <span className="text-[9px] text-slate-400 block mt-0.5">
-                                *Reminds: Do not exceed doctor's prescription. Do not self-prescribe.
-                              </span>
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={symptomSearch}
+                      onChange={(e) => {
+                        setSymptomSearch(e.target.value);
+                        setSelectedSymptomTag(null);
+                      }}
+                      placeholder="Type a symptom e.g. fever, headache, reflux, asthma, allergy..."
+                      className="w-full bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-850 rounded-lg pl-3 pr-3 py-2 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:ring-1 focus:ring-teal-500"
+                    />
+                  </div>
+
+                  {/* Symptom Tags */}
+                  <div className="flex flex-wrap gap-1 pt-1">
+                    {["Fever", "Headache", "Acid Reflux", "Allergy", "Asthma", "High BP", "UTI", "Diarrhea", "Vomiting"].map((tag) => {
+                      const isActive = selectedSymptomTag === tag;
+                      return (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => {
+                            setSelectedSymptomTag(isActive ? null : tag);
+                            setSymptomSearch("");
+                          }}
+                          className={`text-[8.5px] font-bold px-2 py-1 rounded-md border transition-all cursor-pointer ${
+                            isActive
+                              ? "bg-teal-600 text-white border-teal-600"
+                              : "bg-white text-slate-500 border-slate-200 dark:bg-slate-900 dark:border-slate-800 hover:bg-slate-50"
+                          }`}
+                        >
+                          {tag}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+
+                {/* Filtered Master Medicines */}
+                {(() => {
+                  const query = symptomSearch.trim().toLowerCase();
+                  const activeTag = selectedSymptomTag?.toLowerCase();
+                  
+                  const filtered = MASTER_MEDICINE_DATABASE.filter((med) => {
+                    if (activeTag) {
+                      const tagMap: Record<string, string> = {
+                        "acid reflux": "acid",
+                        "high bp": "hypertension",
+                      };
+                      const queryTerm = tagMap[activeTag] || activeTag;
+                      return med.symptoms.some(s => s.includes(queryTerm)) || med.name.toLowerCase().includes(queryTerm) || med.category.toLowerCase().includes(queryTerm);
+                    }
+                    if (query) {
+                      return med.symptoms.some(s => s.includes(query)) || med.name.toLowerCase().includes(query) || med.category.toLowerCase().includes(query) || med.commonUses.toLowerCase().includes(query);
+                    }
+                    return false;
+                  });
+
+                  if (filtered.length === 0 && (query || activeTag)) {
+                    return (
+                      <p className="text-center text-xs text-slate-400 py-4 italic bg-slate-50/50 dark:bg-slate-950/20 rounded-xl">
+                        No master medicine details found matching "{selectedSymptomTag || symptomSearch}".
+                      </p>
+                    );
+                  }
+
+                  if (filtered.length > 0) {
+                    return (
+                      <div className="space-y-2 border-t border-slate-100 dark:border-slate-800 pt-3 no-print">
+                        <span className="text-[9px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider block pl-1">
+                          Matched Master Medicines ({filtered.length})
+                        </span>
+                        {filtered.map((med, idx) => {
+                          const isExpanded = expandedMasterMedicine === med.name;
+                          return (
+                            <div
+                              key={idx}
+                              className="bg-white dark:bg-slate-900 border border-teal-100 dark:border-teal-955 rounded-xl overflow-hidden hover:shadow-xs transition-all"
+                            >
+                              <button
+                                onClick={() => setExpandedMasterMedicine(isExpanded ? null : med.name)}
+                                className="w-full p-3 flex items-start justify-between text-left cursor-pointer bg-teal-50/10 dark:bg-teal-950/5"
+                              >
+                                <div className="space-y-1 min-w-0 pr-4">
+                                  <div className="flex flex-wrap items-center gap-1.5">
+                                    <h5 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-tight">
+                                      {med.name}
+                                    </h5>
+                                    <span className="text-[8.5px] px-1.5 py-0.2 rounded font-bold bg-teal-50 border border-teal-200 dark:bg-teal-950/30 dark:border-teal-900/30 text-teal-600 dark:text-teal-400">
+                                      {med.category}
+                                    </span>
+                                  </div>
+                                  <p className="text-[10px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                                    Uses: {med.commonUses}
+                                  </p>
+                                </div>
+                                <div className="flex flex-col items-end shrink-0 justify-between h-full gap-1.5">
+                                  <span className="text-[9px] px-1.5 py-0.2 rounded bg-slate-100 dark:bg-slate-800 text-slate-600 dark:text-slate-350 font-bold">
+                                    {med.type}
+                                  </span>
+                                  {isExpanded ? <ChevronUp className="w-3.5 h-3.5 text-slate-400" /> : <ChevronDown className="w-3.5 h-3.5 text-slate-400" />}
+                                </div>
+                              </button>
+
+                              {isExpanded && (
+                                <div className="px-3.5 pb-3.5 pt-2 border-t border-slate-100 dark:border-slate-800 space-y-2 bg-slate-50/20 dark:bg-slate-950/5 text-[11px] leading-relaxed">
+                                  <div>
+                                    <span className="text-[9px] font-bold text-teal-600 dark:text-teal-400 uppercase tracking-wider block">Mechanism of Action</span>
+                                    <p className="text-slate-600 dark:text-slate-350">{med.mechanismOfAction}</p>
+                                  </div>
+
+                                  {/* Age-specific Dosages Panel */}
+                                  <div className="bg-slate-100/50 dark:bg-slate-950/40 p-2.5 rounded-lg border border-slate-200 dark:border-slate-850 space-y-2">
+                                    <span className="text-[9px] font-bold text-slate-500 dark:text-slate-400 uppercase tracking-wider block border-b border-slate-200 dark:border-slate-800 pb-1">
+                                      Dosage Guidelines (All Age Groups)
+                                    </span>
+                                    <div className="space-y-1.5 text-[10.5px]">
+                                      <div>
+                                        <span className="font-bold text-teal-600 dark:text-teal-400">👶 Pediatrics:</span>{" "}
+                                        <span className="text-slate-700 dark:text-slate-300">{med.pediatricDosage}</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-bold text-rose-600 dark:text-rose-450">👤 Adults:</span>{" "}
+                                        <span className="text-slate-700 dark:text-slate-300">{med.adultDosage}</span>
+                                      </div>
+                                      <div>
+                                        <span className="font-bold text-amber-600 dark:text-amber-450">👵 Geriatrics (Seniors):</span>{" "}
+                                        <span className="text-slate-700 dark:text-slate-300">{med.geriatricDosage}</span>
+                                      </div>
+                                    </div>
+                                  </div>
+                                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                                    <div>
+                                      <span className="text-[9px] font-bold text-amber-500 uppercase tracking-wider block">Common Side Effects</span>
+                                      <ul className="list-disc pl-3.5 text-slate-600 dark:text-slate-400 text-[10.5px]">
+                                        {med.commonSideEffects.map((se, sIdx) => <li key={sIdx}>{se}</li>)}
+                                      </ul>
+                                    </div>
+                                    <div>
+                                      <span className="text-[9px] font-bold text-rose-500 uppercase tracking-wider block">Serious Side Effects</span>
+                                      <ul className="list-disc pl-3.5 text-slate-600 dark:text-slate-400 text-[10.5px]">
+                                        {med.seriousSideEffects.map((se, sIdx) => <li key={sIdx}>{se}</li>)}
+                                      </ul>
+                                    </div>
+                                  </div>
+                                  <div>
+                                    <span className="text-[9px] font-bold text-red-500 uppercase tracking-wider block">Precautions & Warnings</span>
+                                    <p className="text-slate-600 dark:text-slate-350">{med.precautions}</p>
+                                  </div>
+                                </div>
+                              )}
                             </div>
-                          )}
+                          );
+                        })}
+                      </div>
+                    );
+                  }
+                  return null;
+                })()}
 
-                          <div className="grid grid-cols-2 gap-2.5">
-                            {med.commonSideEffects && med.commonSideEffects.length > 0 && (
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider pl-1">
+                  Active Consultation Medicines ({session.educationalMedicines.length})
+                </h4>
+
+                {session.educationalMedicines.length === 0 ? (
+                  <div className="text-center py-10 bg-slate-50 dark:bg-slate-950 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
+                    <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
+                      Educational guidance on medicines will display here if discussed during chat, or if related to analyzed symptoms.
+                    </p>
+                  </div>
+                ) : (
+                  <div className="space-y-2">
+                    {session.educationalMedicines.map((med, i) => {
+                      const isExpanded = expandedMedicine === med.name;
+                      return (
+                        <div
+                          key={i}
+                          className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-xl overflow-hidden hover:shadow-sm transition-all"
+                        >
+                          <button
+                            onClick={() => setExpandedMedicine(isExpanded ? null : med.name)}
+                            className="w-full p-3.5 flex items-start justify-between text-left cursor-pointer"
+                          >
+                            <div className="space-y-1.5 min-w-0 pr-4">
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <h5 className="text-xs font-bold text-slate-800 dark:text-slate-100 leading-tight">
+                                  {med.name}
+                                </h5>
+                                <span className="text-[9px] px-1.5 py-0.5 rounded font-bold bg-slate-50 border border-slate-200 dark:bg-slate-800 dark:border-slate-700 text-slate-600 dark:text-slate-300">
+                                  {med.category}
+                                </span>
+                              </div>
+                              <p className="text-[11px] text-slate-500 dark:text-slate-400 line-clamp-1">
+                                Uses: {med.commonUses}
+                              </p>
+                            </div>
+                            <div className="flex flex-col items-end shrink-0 justify-between h-full gap-2">
+                              <span className={`text-[10px] px-2 py-0.5 rounded-full font-semibold ${med.type === "Over-the-Counter" ? "bg-teal-50 text-teal-600 dark:bg-teal-950/20" : "bg-purple-50 text-purple-600 dark:bg-purple-950/20"}`}>
+                                {med.type}
+                              </span>
+                              {isExpanded ? <ChevronUp className="w-4 h-4 text-slate-400" /> : <ChevronDown className="w-4 h-4 text-slate-400" />}
+                            </div>
+                          </button>
+
+                          {isExpanded && (
+                            <div className="px-4 pb-4 pt-1.5 border-t border-slate-50 dark:border-slate-950 space-y-3 bg-slate-50/20 dark:bg-slate-950/5">
                               <div>
                                 <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-                                  Common Side Effects
+                                  Mechanism of Action
                                 </span>
-                                <ul className="list-disc pl-3 text-[11px] text-slate-600 dark:text-slate-300">
-                                  {med.commonSideEffects.map((se, idx) => <li key={idx}>{se}</li>)}
-                                </ul>
+                                <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                  {med.mechanismOfAction}
+                                </p>
                               </div>
-                            )}
 
-                            {med.seriousSideEffects && med.seriousSideEffects.length > 0 && (
-                              <div>
-                                <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider block mb-0.5">
-                                  Serious Side Effects (Contact Doc)
-                                </span>
-                                <ul className="list-disc pl-3 text-[11px] text-red-700 dark:text-red-400">
-                                  {med.seriousSideEffects.map((se, idx) => <li key={idx}>{se}</li>)}
-                                </ul>
+                              {med.commonAdultDosageRange && (
+                                <div>
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                                    Typical Adult Dosage Range
+                                  </span>
+                                  <p className="text-xs text-slate-600 dark:text-slate-300 font-semibold">
+                                    {med.commonAdultDosageRange}
+                                  </p>
+                                  <span className="text-[9px] text-slate-400 block mt-0.5">
+                                    *Reminds: Do not exceed doctor's prescription. Do not self-prescribe.
+                                  </span>
+                                </div>
+                              )}
+
+                              <div className="grid grid-cols-2 gap-2.5">
+                                {med.commonSideEffects && med.commonSideEffects.length > 0 && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                                      Common Side Effects
+                                    </span>
+                                    <ul className="list-disc pl-3 text-[11px] text-slate-600 dark:text-slate-300">
+                                      {med.commonSideEffects.map((se, idx) => <li key={idx}>{se}</li>)}
+                                    </ul>
+                                  </div>
+                                )}
+
+                                {med.seriousSideEffects && med.seriousSideEffects.length > 0 && (
+                                  <div>
+                                    <span className="text-[10px] font-bold text-red-600 uppercase tracking-wider block mb-0.5">
+                                      Serious Side Effects (Contact Doc)
+                                    </span>
+                                    <ul className="list-disc pl-3 text-[11px] text-red-700 dark:text-red-400">
+                                      {med.seriousSideEffects.map((se, idx) => <li key={idx}>{se}</li>)}
+                                    </ul>
+                                  </div>
+                                )}
                               </div>
-                            )}
-                          </div>
 
-                          {med.contraindications && med.contraindications.length > 0 && (
-                            <div>
-                              <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block mb-0.5">
-                                Contraindications
-                              </span>
-                              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-semibold">
-                                {med.contraindications.join(", ")}
-                              </p>
-                            </div>
-                          )}
+                              {med.contraindications && med.contraindications.length > 0 && (
+                                <div>
+                                  <span className="text-[10px] font-bold text-rose-700 uppercase tracking-wider block mb-0.5">
+                                    Contraindications
+                                  </span>
+                                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed font-semibold">
+                                    {med.contraindications.join(", ")}
+                                  </p>
+                                </div>
+                              )}
 
-                          {med.drugInteractions && med.drugInteractions.length > 0 && (
-                            <div>
-                              <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-0.5">
-                                Potential Drug Interactions
-                              </span>
-                              <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
-                                {med.drugInteractions.join(", ")}
-                              </p>
-                            </div>
-                          )}
+                              {med.drugInteractions && med.drugInteractions.length > 0 && (
+                                <div>
+                                  <span className="text-[10px] font-bold text-amber-700 uppercase tracking-wider block mb-0.5">
+                                    Potential Drug Interactions
+                                  </span>
+                                  <p className="text-xs text-slate-600 dark:text-slate-300 leading-relaxed">
+                                    {med.drugInteractions.join(", ")}
+                                  </p>
+                                </div>
+                              )}
 
-                          {med.precautions && (
-                            <div className="bg-slate-100 dark:bg-slate-950 p-2 rounded text-[11px] text-slate-500 leading-relaxed">
-                              <strong className="text-slate-700 dark:text-slate-200 block mb-0.5">Special Precautions:</strong>
-                              {med.precautions}
-                            </div>
-                          )}
+                              {med.precautions && (
+                                <div className="bg-slate-100 dark:bg-slate-950 p-2 rounded text-[11px] text-slate-500 leading-relaxed">
+                                  <strong className="text-slate-700 dark:text-slate-200 block mb-0.5">Special Precautions:</strong>
+                                  {med.precautions}
+                                </div>
+                              )}
 
-                          {med.storageInstructions && (
-                            <div>
-                              <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
-                                Storage & Handling
-                              </span>
-                              <p className="text-xs text-slate-600 dark:text-slate-300">
-                                {med.storageInstructions}
-                              </p>
+                              {med.storageInstructions && (
+                                <div>
+                                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block mb-0.5">
+                                    Storage & Handling
+                                  </span>
+                                  <p className="text-xs text-slate-600 dark:text-slate-300">
+                                    {med.storageInstructions}
+                                  </p>
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>
-                      )}
-                    </div>
-                  );
-                })}
+                      );
+                    })}
+                  </div>
+                )}
               </div>
+            )}
+
+            {medSubTab === "scheduler" && (
+              <MedicationScheduler session={session} />
+            )}
+
+            {medSubTab === "interactions" && (
+              <InteractionChecker />
             )}
           </div>
         )}

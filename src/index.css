@@ -21,3 +21,50 @@ body {
   font-size: 16px;
 }
 
+/* @media print styles for clinical report export */
+@media print {
+  body, html {
+    background: white !important;
+    color: #000 !important;
+    width: 100% !important;
+    height: auto !important;
+    overflow: visible !important;
+    font-size: 11pt !important;
+  }
+  header, 
+  footer,
+  aside,
+  button,
+  form,
+  .no-print,
+  .lg\:col-span-6\:first-of-type,
+  section:first-of-type {
+    display: none !important;
+  }
+  main {
+    display: block !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  section.lg\:col-span-6 {
+    width: 100% !important;
+    max-width: 100% !important;
+    height: auto !important;
+    min-height: 0 !important;
+  }
+  #patient-case-file {
+    border: none !important;
+    box-shadow: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    padding: 0 !important;
+  }
+  /* Show all info headers clearly */
+  .border-b-2 {
+    display: none !important;
+  }
+}
+
+
