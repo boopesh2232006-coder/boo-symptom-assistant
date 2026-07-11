@@ -6,6 +6,7 @@ import { Stethoscope, AlertTriangle, RefreshCw, LogOut, Settings as SettingsIcon
 import { TRANSLATIONS, LanguageCode } from "./lib/translations";
 import { WelcomePage } from "./components/WelcomePage";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { Analytics } from "@vercel/analytics/react";
 
 const LOCAL_STORAGE_KEY = "boo_symptom_sessions";
 
@@ -489,6 +490,7 @@ export default function App() {
         onUpdateCoordinates={handleUpdateCoordinates}
         onResetDatabase={handleHardReset}
       />
+      <Analytics />
     </div>
   );
 
