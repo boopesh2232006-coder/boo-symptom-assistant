@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from "react";
 import { APIProvider, Map, AdvancedMarker, Pin, InfoWindow, useMap, useMapsLibrary } from "@vis.gl/react-google-maps";
 import { ChatSession } from "../types";
+import { HospitalDetails } from "./HospitalDetails";
 import {
   MapPin,
   Search,
@@ -438,6 +439,7 @@ interface HospitalLocatorProps {
 }
 
 export const HospitalLocator: React.FC<HospitalLocatorProps> = ({ session }) => {
+  const [subTab, setSubTab] = useState<"radar" | "directory">("radar");
   // Define default coordinate around Stanford/Palo Alto area as patient home coordinate
   const [homeCoords, setHomeCoords] = useState<{ lat: number; lng: number }>({
     lat: 37.4275,
@@ -467,39 +469,76 @@ export const HospitalLocator: React.FC<HospitalLocatorProps> = ({ session }) => 
     session?.extractedData?.place
   ]);
 
-  if (!hasValidKey) {
-    // Return custom interactive simulated telemetry dashboard
+  const renderContent = () => {
+    if (subTab === "directory") {
+      return <HospitalDetails language={session?.language || "en"} />;
+    }
+
+    if (!hasValidKey) {
+      return (
+        <MapContainer
+          session={session}
+          homeCoords={homeCoords}
+          setHomeCoords={setHomeCoords}
+          homeAddress={homeAddress}
+          setHomeAddress={setHomeAddress}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          erFilter={erFilter}
+          setErFilter={setErFilter}
+          isSimulated={true}
+        />
+      );
+    }
+
     return (
-      <MapContainer
-        session={session}
-        homeCoords={homeCoords}
-        setHomeCoords={setHomeCoords}
-        homeAddress={homeAddress}
-        setHomeAddress={setHomeAddress}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        erFilter={erFilter}
-        setErFilter={setErFilter}
-        isSimulated={true}
-      />
+      <APIProvider apiKey={API_KEY} version="weekly" libraries={["places", "routes"]}>
+        <MapContainer
+          session={session}
+          homeCoords={homeCoords}
+          setHomeCoords={setHomeCoords}
+          homeAddress={homeAddress}
+          setHomeAddress={setHomeAddress}
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          erFilter={erFilter}
+          setErFilter={setErFilter}
+          isSimulated={false}
+        />
+      </APIProvider>
     );
-  }
+  };
 
   return (
-    <APIProvider apiKey={API_KEY} version="weekly" libraries={["places", "routes"]}>
-      <MapContainer
-        session={session}
-        homeCoords={homeCoords}
-        setHomeCoords={setHomeCoords}
-        homeAddress={homeAddress}
-        setHomeAddress={setHomeAddress}
-        searchQuery={searchQuery}
-        setSearchQuery={setSearchQuery}
-        erFilter={erFilter}
-        setErFilter={setErFilter}
-        isSimulated={false}
-      />
-    </APIProvider>
+    <div className="flex flex-col h-full bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-3xl overflow-hidden shadow-xl">
+      {/* Sub-tab Switcher Header */}
+      <div className="flex border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 px-4 py-2 shrink-0 gap-1.5">
+        <button
+          onClick={() => setSubTab("radar")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            subTab === "radar"
+              ? "bg-teal-600 text-white shadow-sm"
+              : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+          }`}
+        >
+          🛰️ Dispatch Radar Map
+        </button>
+        <button
+          onClick={() => setSubTab("directory")}
+          className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all cursor-pointer ${
+            subTab === "directory"
+              ? "bg-teal-600 text-white shadow-sm"
+              : "text-slate-500 hover:text-slate-800 dark:hover:text-slate-200"
+          }`}
+        >
+          📞 State & District Directory
+        </button>
+      </div>
+
+      <div className="flex-1 min-h-0">
+        {renderContent()}
+      </div>
+    </div>
   );
 };
 

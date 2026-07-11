@@ -1,4 +1,4 @@
-export type LanguageCode = 'en' | 'es' | 'fr' | 'de' | 'zh' | 'ja' | 'pt' | 'hi' | 'ar' | 'ru';
+export type LanguageCode = 'en' | 'es' | 'fr' | 'de' | 'zh' | 'ja' | 'pt' | 'hi' | 'ar' | 'ru' | 'ta';
 
 export interface LanguageDef {
   code: LanguageCode;
@@ -17,7 +17,8 @@ export const LANGUAGES: LanguageDef[] = [
   { code: 'pt', name: 'Portuguese', nativeName: 'Português', flag: '🇵🇹' },
   { code: 'hi', name: 'Hindi', nativeName: 'हिन्दी', flag: '🇮🇳' },
   { code: 'ar', name: 'Arabic', nativeName: 'العربية', flag: '🇸🇦' },
-  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' }
+  { code: 'ru', name: 'Russian', nativeName: 'Русский', flag: '🇷🇺' },
+  { code: 'ta', name: 'Tamil', nativeName: 'தமிழ்', flag: '🇮🇳' }
 ];
 
 export interface TranslationDict {
@@ -1063,5 +1064,99 @@ export const TRANSLATIONS: Record<LanguageCode, TranslationDict> = {
     hospitalsSearchBtn: "Поиск",
     hospitalsLocateBtn: "Найти по GPS",
     hospitalsRadarActive: "Диспетчерский радар активен (режим симуляции)"
+  },
+  ta: {
+    appName: "BOO சுகாதார பணிமனை",
+    appSlogan: "சிறந்த உகந்த ஆன்லைன் சுகாதார உதவியாளர்",
+    clinicalLabel: "மருத்துவ உதவி v1.2",
+    clearCaseLogs: "நோயாளி பதிவுகளை அழி",
+    confirmReset: "அனைத்து நோயாளி மருத்துவ பதிவுகளையும் வரலாற்றையும் அழிக்க விரும்புகிறீர்களா?",
+
+    welcomeTitle: "BOO சுகாதார பணிமனைக்கு வரவேற்கிறோம்",
+    welcomeSubtitle: "சிறந்த உகந்த ஆன்லைன் உதவியாளர் & அவசர வழித்தடம்",
+    welcomeDesc: "அறிகுறிகளை பகுப்பாய்வு செய்யவும், மருத்துவ வரலாற்றைக் கண்காணிக்கவும், அருகிலுள்ள அவசர சிகிச்சை மையங்களை கண்டறியவும் மற்றும் கல்விசார் மருத்துவ மதிப்பீடுகளைப் பெறவும்.",
+    welcomeFeature1Title: "புத்திசாலித்தனமான அறிகுறி சரிபார்ப்பு",
+    welcomeFeature1Desc: "பயனர் விவரிக்கும் அறிகுறிகளை பகுப்பாய்வு செய்து, முக்கிய மருத்துவ தகவல்கள் மற்றும் சாத்தியமான நோய்களைக் கண்டறியும்.",
+    welcomeFeature2Title: "அவசர சிகிச்சை மைய இருப்பிடங்காட்டி",
+    welcomeFeature2Desc: "சிறந்த ஓட்டுநர் பாதைகள், நிகழ்நேர அவசர காத்திருப்பு நேரம் மற்றும் பணியில் உள்ள சிறப்பு மருத்துவர்களை அறியலாம்.",
+    welcomeFeature3Title: "பாதுகாப்பான பன்மொழி அமைப்பு",
+    welcomeFeature3Desc: "உலகளாவிய மருத்துவ அணுகலுக்காக 11 முக்கிய மொழிகளில் தடையற்ற மருத்துவ ஆதரவு.",
+    selectLanguage: "உங்கள் விருப்பமான மொழியைத் தேர்ந்தெடுக்கவும்",
+    startBtn: "மருத்துவ பணிமனையைத் தொடங்குக",
+    disclaimerTitle: "முக்கிய மருத்துவ பொறுப்புத் துறப்பு",
+    disclaimerText: "BOO என்பது AI மூலம் இயங்கும் ஒரு கல்வி குறிப்பு உதவியாளர் மட்டுமே. இது மருத்துவ நோயறிதலை வழங்காது அல்லது உரிமம் பெற்ற மருத்துவரின் ஆலோசனைக்கு மாற்றாகாது. உங்களுக்கு கடுமையான அல்லது உயிருக்கு ஆபத்தான அறிகுறிகள் இருந்தால், உடனடியாக அவசர சேவைகளை அழைக்கவும்.",
+
+    settingsTitle: "பயன்பாட்டு அமைப்புகள்",
+    settingsSubtitle: "பயன்பாட்டின் தோற்றம், மொழிகள் மற்றும் நோயாளி GPS ஒருங்கிணைப்புகளை உள்ளமைக்கவும்.",
+    settingsLanguage: "பயன்பாட்டு மொழி",
+    settingsTextSize: "பணிமனை உரை அளவு",
+    settingsTextSizeSm: "சிறிய (காம்பாக்ட்)",
+    settingsTextSizeMd: "நடுத்தர (நிலையானது)",
+    settingsTextSizeLg: "பெரிய (மேம்படுத்தப்பட்ட)",
+    settingsTheme: "வண்ணத் தீம்",
+    settingsThemeLight: "மருத்துவ வெள்ளை",
+    settingsThemeSlate: "நார்டிக் ஸ்லேட்",
+    settingsThemeDark: "அவசரகால இருண்ட பயன்முறை",
+    settingsMockGps: "நோயாளி இருப்பிடத்தை மாற்று (GPS)",
+    settingsMockGpsDesc: "உள்ளூர் அவசரகால வசதிகள் மற்றும் அருகிலுள்ள ஆம்புலன்ஸ் வழித்தடங்களை உருவகப்படுத்த ஒருங்கிணைப்புகளைத் தேர்ந்தெடுக்கவும்.",
+    settingsResetBtn: "தரவுத்தளத்தை மீட்டமைக்கவும்",
+    settingsCloseBtn: "பயன்படுத்து & மூடு",
+    settingsSaveBtn: "விருப்பங்களைச் சேமி",
+
+    tabChart: "நோயாளி விளக்கப்படம்",
+    tabDiagnosis: "AI நோயறிதல்",
+    tabMedicines: "மருந்தவுகள்",
+    tabCare: "வசதிகள்",
+    tabHospitals: "மருத்துவமனைகள்",
+    tabHistory: "வழக்கு வரலாறு",
+
+    chatPlaceholder: "நோயாளியின் அறிகுறிகள், காலம், வலியின் தீவிரம் அல்லது மருத்துவ வரலாற்றை உள்ளிடவும்...",
+    chatSendBtn: "அறிகுறிகளை பகுப்பாய்வு செய்",
+    chatEmergencyAlert: "முக்கிய எச்சரிக்கை: அவசர நிலை கண்டறியப்பட்டுள்ளது! உடனடியாக மருத்துவ உதவியை நாடவும்.",
+    chatAILoading: "அறிகுறிகளை பகுப்பாய்வு செய்து நோயாளி விளக்கப்படத்தைத் தொகுக்கிறது...",
+    chatConsultationTitle: "செயலில் உள்ள ஆலோசனை",
+    chatNoMessages: "அறிகுறி பகுப்பாய்வு செயலில் உள்ளது",
+    chatNoMessagesSubtitle: "அறிகுறிகளை விரிவாக விவரிக்கவும் (எ.கா. '34 வயது ஆண், 2 மணிநேரமாக நெஞ்சு வலி'). எங்கள் அமைப்பு முக்கிய விவரங்களைக் கண்டறிந்து, அபாயங்களை மதிப்பிட்டு, அருகிலுள்ள அவசர சிகிச்சை மையங்களைக் காட்டும்.",
+
+    patientInfoTitle: "மருத்துவ சுருக்கம் மற்றும் நோயாளி விளக்கப்படம்",
+    patientInfoDesc: "செயலில் உள்ள உரையாடலில் இருந்து பிரித்தெடுக்கப்பட்ட முக்கிய அளவுருக்கள்:",
+    patientAge: "வயது",
+    patientSex: "உயிரியல் பாலினம்",
+    patientDuration: "அறிகுறி காலம்",
+    patientPain: "வலியின் தீவிரம்",
+    patientTemp: "உடல் வெப்பநிலை",
+    patientAllergies: "அறியப்பட்ட ஒவ்வாமைகள்",
+    patientMeds: "தற்போதைய மருந்துகள்",
+    patientDiseases: "நாள்பட்ட நோய்கள்",
+    patientInfections: "சமீபத்திய தொற்றுகள்",
+    patientTravel: "பயண வரலாறு",
+    patientPregnancy: "கர்ப்ப நிலை",
+    patientLifestyle: "வாழ்க்கை முறை பழக்கவழக்கங்கள்",
+    patientGpsLocation: "GPS ஒருங்கிணைப்புகள்",
+    notExtracted: "இன்னும் எடுக்கப்படவில்லை",
+
+    urgencyLevel: "அவசர நிலை",
+    urgencyLow: "குறைந்த (சுய பாதுகாப்பு ஆலோசனை)",
+    urgencyMedium: "நடுத்தர (குடும்ப மருத்துவரை அணுகவும்)",
+    urgencyHigh: "அதிக (உடனடி மருத்துவ ஆலோசனை பரிந்துரைக்கப்படுகிறது)",
+    urgencyEmergency: "🚨 அவசர நிலை (உடனடியாக அவசர சிகிச்சை பிரிவுக்குச் செல்லவும்)",
+    confidence: "நம்பிக்கை",
+    probability: "சாத்தியக்கூறு நிலை",
+    actionRequired: "பரிந்துரைக்கப்பட்ட மருத்துவ நடவடிக்கை",
+    complications: "சிகிச்சை அளிக்கப்படாவிட்டால் ஏற்படும் சிக்கல்கள்",
+
+    hospitalsTitle: "அவசர மருத்துவமனை மற்றும் சிகிச்சை இருப்பிடங்காட்டி",
+    hospitalsDesc: "நிலை-1 சிகிச்சை மையங்கள், ஆம்புலன்ஸ்கள், அவசர சிகிச்சை பிரிவுகள் மற்றும் குழந்தை மருத்துவ பிரிவுகளின் நேரடி கண்காணிப்பு.",
+    hospitalsFilterAll: "அனைத்து மருத்துவமனைகள்",
+    hospitalsFilterTrauma: "நிலை 1/2 சிகிச்சை மையங்கள்",
+    hospitalsFilterFast: "காத்திருப்பு நேரம் < 15 நிமிடங்கள்",
+    hospitalsWaitTime: "ER காத்திருப்பு நேரம்",
+    hospitalsIcuBeds: "கிடைக்கக்கூடிய ICU படுக்கைகள்",
+    hospitalsActiveStaff: "பணியில் உள்ள சிறப்புப் பிரிவு",
+    hospitalsDirections: "ஆம்புலன்ஸ் வழித்தடத்தைப் பெறுக",
+    hospitalsSearchPlaceholder: "பிற பகுதியின் மருத்துவமனைகள், பின்கோடு அல்லது நகரத்தைத் தேடுங்கள்...",
+    hospitalsSearchBtn: "தேடு",
+    hospitalsLocateBtn: "GPS கண்டறி",
+    hospitalsRadarActive: "பணி ஒதுக்கீடு ரேடார் செயலில் உள்ளது (உருவகப்படுத்துதல் பயன்முறை)"
   }
 };

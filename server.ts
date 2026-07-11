@@ -34,9 +34,15 @@ CRITICAL OBJECTIVES:
 1. EDUCATIONAL DISCLAIMER: State clearly and frequently that your responses are educational only and should never replace professional medical diagnosis, treatment, or advice. Never claim certainty about a diagnosis. Every single message you write must end with the following exact disclaimer: "BOO is an AI educational health assistant and does not replace a licensed medical professional. If your symptoms are severe, worsening, or persistent, please consult a qualified healthcare provider or seek emergency medical care immediately."
 2. CONTINUOUS EMERGENCY SCREENING: Instantly screen for emergency warning signs (severe chest pain, difficulty breathing/dyspnea, stroke symptoms, loss of consciousness, anaphylaxis, severe uncontrolled bleeding, suicidal ideation, poisoning, active seizures, severe dehydration, persistent confusion, high fever in infants, or pregnancy emergencies). If any are present, immediately set "emergencyFlagged" to true, "urgencyLevel" to "EMERGENCY", and command the user to seek immediate emergency care (911 or local equivalent). Do not proceed with standard symptom analysis until this warning is delivered.
 3. CONVERSATIONAL SYMPTOM GATHERING: You must collect detailed symptom information before providing possible condition analyses. Ask natural, context-relevant follow-up questions about: age, biological sex, phone number, place/location, symptom duration, pain intensity (1-10), body temperature, allergies, current medications, medical history, chronic diseases, surgeries, pregnancy status, travel history, recent infections, vaccination status, lifestyle habits (smoking, alcohol, diet, exercise, sleep), family history, mental health factors, and environmental exposure. Do not ask all questions in a giant list; ask 1-3 highly relevant ones at a time to maintain a warm, conversational flow. Ensure that if the patient mentions a phone number or geographic place, it is extracted accurately.
-4. CLINICAL REASONING & RISK TRIA_GE: Evaluate conditions using the full combination of reported symptoms instead of isolated symptoms. Group possible conditions into High Probability, Moderate Probability, and Low Probability. For each, explain why it matches, lists supporting symptoms, lists symptoms that do NOT fit (conflicting), estimates a confidence percentage, lists untreated complications, and recommends next actions.
+   - GENDER-SPECIFIC DETAILS: When biological sex is identified or relevant symptoms are mentioned, ask follow-up questions tailored to that cohort:
+     * For women: ask about pregnancy status, breastfeeding, menstrual cycle details, last menstrual period, or gynecological concerns.
+     * For men: ask about prostate concerns, urinary flow/stream changes, or groin/testicular symptoms.
+4. CLINICAL REASONING & RISK TRIAGE: Evaluate conditions using the full combination of reported symptoms instead of isolated symptoms. Group possible conditions into High Probability, Moderate Probability, and Low Probability. For each, explain why it matches, lists supporting symptoms, lists symptoms that do NOT fit (conflicting), estimates a confidence percentage, lists untreated complications, and recommends next actions.
 5. EDUCATIONAL MEDICINE DIRECTORY: Provide detailed educational information about medicines only. Include category, uses, simple mechanism, typical adult dosage ranges (emphasize following a doctor's prescription), side effects, serious side effects, contraindications, drug interactions, storage, and precautions for children, pregnancy, breastfeeding, elderly, and liver/kidney disease. Clearly distinguish over-the-counter (OTC) from prescription. Never write as if you are prescribing.
 6. PREVENTIVE HEALTHCARE: Tailor advice on hydration, nutrition, sleep, hygiene, physical activity, stress, vaccinations, infection prevention, and home monitoring based on the patient's age and clinical state.
+7. HEALTHCARE FACILITIES DIRECTORY: If the user asks about local healthcare resources, hospitals, clinics, or medical shops (pharmacies):
+   - Provide educational details of facilities, locations, services, or contact info. Mention prominent regional options (e.g., AIIMS, Max, Fortis, KEM, Narayana, Manipal for India/Asia; CVS, Walgreens, Rite Aid, Stanford Hospital for US) based on their mentioned location/country.
+   - Inform them that they can click on the "Hospitals" or "Facilities" tab in the dashboard on the right side of the screen to view interactive maps, locate nearest facilities, search by ZIP or city, calculate routing paths, or simulate ambulance dispatch and ER wait times.
 
 Always output your response in the requested structured JSON schema. Keep the 'message' formatted with clean markdown, utilizing bullet points or neat tables when appropriate.`;
 
@@ -430,6 +436,58 @@ app.post("/api/chat", async (req, res) => {
         recommendedHomeCare = ["Maintain hydration (warm teas, water)", "Adequate bed rest", "Use saline throat sprays or throat lozenges"];
         preventiveMeasures = ["Frequent handwashing", "Get the annual influenza vaccine", "Avoid contact with sick individuals"];
         recommendedSpecialist = "Primary Care Physician (PCP)";
+      } else if (lastMsgLower.includes("hospital") || lastMsgLower.includes("clinic") || lastMsgLower.includes("pharmacy") || lastMsgLower.includes("medical shop") || lastMsgLower.includes("medicine shop") || lastMsgLower.includes("locator") || lastMsgLower.includes("where is")) {
+        message = `### 🏥 Healthcare Facilities & Medical Shops Directory
+
+Here is some educational information regarding local healthcare resources:
+* **Hospitals & Trauma Centers:** Major regional centers like **AIIMS (All India Institute of Medical Sciences)**, **Max Hospital**, **Fortis Hospital**, **KEM Hospital**, **Kokilaben Hospital**, **Narayana Health**, or **Manipal Hospital** offer 24/7 emergency care, ICU beds, and specialized trauma wings.
+* **Pharmacies & Medical Shops:** For prescription and OTC medications, national chains such as **Apollo Pharmacy**, **MedPlus Medicine Shop**, and **Netmeds Wellness** (in India/Asia), or **CVS Pharmacy**, **Walgreens**, and **Rite Aid** (in the US) provide medication dispensing, storage advice, and basic health supplies.
+* **Clinics:** Local outpatient clinics are suitable for non-emergency consultations, simple infections, and routine diagnostics.
+
+👉 **Interactive Map Integration:**
+You can view active routing, ambulance dispatch simulation, and locate the nearest pharmacy, clinic, or level-1 trauma center by clicking on the **"Hospitals"** or **"Facilities"** tab in the dashboard on the right side of your screen. This tool computes real-time routing vectors and estimates ER wait times based on your GPS coordinates or ZIP code.${disclaimer}`;
+      } else if (lastMsgLower.includes("female") || lastMsgLower.includes("woman") || lastMsgLower.includes("pregnancy") || lastMsgLower.includes("menstru") || lastMsgLower.includes("breastfeed") || lastMsgLower.includes("gyneco") || lastMsgLower.includes("period")) {
+        message = `### ♀️ Female Health & Symptom Analysis
+
+We are analyzing your symptoms with consideration of female-specific health factors. To provide the most accurate educational guidance, please share the following details:
+1. **Pregnancy/Breastfeeding Status:** Are you currently pregnant (if so, which trimester?) or breastfeeding?
+2. **Menstrual Details:** What was the date of your Last Menstrual Period (LMP)? Are your cycles regular, and do you experience severe cramping or heavy bleeding?
+3. **Associated Symptoms:** Do you have any lower abdominal/pelvic pain, abnormal discharge, fever, or painful urination?
+4. **General Symptoms:** What is the duration of your symptoms and pain intensity (1-10)?${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Dysmenorrhea / Pelvic Inflammatory Disease (PID) consideration",
+            probabilityCategory: "Moderate Probability",
+            reasoning: "Reported female health history or lower pelvic complaints warrant screening for uterine, ovarian, or cyclic inflammation.",
+            supportingSymptoms: ["Pelvic complaints", "Female health indicator"],
+            conflictingSymptoms: [],
+            confidencePercentage: 65,
+            complicationsIfUntreated: "Chronic pelvic pain, fertility complications, or ascending reproductive tract infections.",
+            recommendedAction: "Schedule a comprehensive examination with a Gynecologist.",
+          }
+        ];
+        recommendedSpecialist = "Gynecologist";
+      } else if (lastMsgLower.includes("male") || lastMsgLower.includes("man") || lastMsgLower.includes("prostate") || lastMsgLower.includes("testic") || lastMsgLower.includes("groin") || lastMsgLower.includes("scrot")) {
+        message = `### ♂️ Male Health & Symptom Analysis
+
+We are analyzing your symptoms with consideration of male-specific health factors. To help customize your educational guidance, please share the following details:
+1. **Urinary Symptoms:** Have you noticed a weak urinary stream, difficulty starting urination, frequent nighttime urination (nocturia), or a feeling of incomplete emptying?
+2. **Groin/Testicular Details:** Are you experiencing any localized pain, swelling, heaviness, or lumps in the testicular or groin region?
+3. **Associated Symptoms:** Do you have a fever, back pain, or pain/burning during urination or ejaculation?
+4. **General Symptoms:** How long have you had these symptoms, and what is their pain level (1-10)?${disclaimer}`;
+        possibleConditions = [
+          {
+            name: "Prostatitis / Benign Prostatic Hyperplasia (BPH) consideration",
+            probabilityCategory: "Moderate Probability",
+            reasoning: "Reported male health cohort indicators or lower urinary tract discomfort can represent prostate enlargement or inflammation.",
+            supportingSymptoms: ["Urinary/groin complaints", "Male health indicator"],
+            conflictingSymptoms: [],
+            confidencePercentage: 60,
+            complicationsIfUntreated: "Acute urinary retention, bladder damage, recurrent UTIs, or renal impairment.",
+            recommendedAction: "Consult with a Urologist for a physical exam and PSA/urinalysis tests.",
+          }
+        ];
+        recommendedSpecialist = "Urologist";
       } else {
         message = `Welcome to BOO. I am listening to your health concerns. Please share more details about your symptoms, such as their duration, pain intensity (on a scale of 1-10), and if you have any other relevant health history.${disclaimer}`;
       }
