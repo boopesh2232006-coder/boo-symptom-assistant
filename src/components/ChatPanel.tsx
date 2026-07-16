@@ -1,6 +1,6 @@
 import React, { useRef, useEffect } from "react";
 import { Message, ChatSession } from "../types";
-import { Send, AlertTriangle, Activity, Stethoscope, Sparkles, Map as MapIcon, Compass, ArrowRight } from "lucide-react";
+import { Send, AlertTriangle, Activity, Stethoscope, Sparkles, Map as MapIcon, Compass, ArrowRight, Mic, MicOff } from "lucide-react";
 import { TRANSLATIONS, LanguageCode } from "../lib/translations";
 
 interface ChatPanelProps {
@@ -108,6 +108,58 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const t = TRANSLATIONS[language];
+
+  const [isRecording, setIsRecording] = React.useState(false);
+  const recognitionRef = useRef<any>(null);
+
+  const toggleRecording = () => {
+    if (isRecording) {
+      if (recognitionRef.current) {
+        recognitionRef.current.stop();
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
+    if (!SpeechRecognition) {
+      alert("Voice recognition is not supported in this browser. Please try Google Chrome.");
+      return;
+    }
+
+    try {
+      const rec = new SpeechRecognition();
+      rec.continuous = false;
+      rec.interimResults = false;
+      rec.lang = language === "es" ? "es-ES" : language === "fr" ? "fr-FR" : language === "ta" ? "ta-IN" : language === "hi" ? "hi-IN" : "en-US";
+
+      rec.onstart = () => {
+        setIsRecording(true);
+      };
+
+      rec.onresult = (event: any) => {
+        const transcript = event.results[0][0].transcript;
+        if (transcript) {
+          setInput(input ? `${input} ${transcript}` : transcript);
+        }
+      };
+
+      rec.onerror = (e: any) => {
+        console.error("Speech recognition error:", e);
+        setIsRecording(false);
+      };
+
+      rec.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = rec;
+      rec.start();
+    } catch (e) {
+      console.error(e);
+      setIsRecording(false);
+    }
+  };
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
@@ -366,9 +418,21 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
             className="flex-1 bg-slate-50 dark:bg-slate-950 border border-slate-200 dark:border-slate-800 rounded-xl px-3.5 py-2.5 text-xs text-slate-800 dark:text-slate-100 placeholder:text-slate-400 focus:outline-none focus:border-teal-500 focus:ring-1 focus:ring-teal-500/20 disabled:opacity-50"
           />
           <button
+            type="button"
+            onClick={toggleRecording}
+            className={`w-10 h-10 rounded-xl flex items-center justify-center transition-all cursor-pointer shrink-0 ${
+              isRecording
+                ? "bg-rose-500 hover:bg-rose-600 text-white animate-pulse"
+                : "bg-slate-100 dark:bg-slate-800 text-slate-500 hover:bg-slate-200 dark:hover:bg-slate-700"
+            }`}
+            title={isRecording ? "Stop Recording" : "Record Voice Symptoms"}
+          >
+            {isRecording ? <MicOff className="w-4 h-4" /> : <Mic className="w-4 h-4" />}
+          </button>
+          <button
             type="submit"
             disabled={!input.trim() || isLoading}
-            className="w-10 h-10 rounded-xl bg-teal-600 hover:bg-teal-700 text-white flex items-center justify-center shadow-sm hover:shadow transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer"
+            className="w-10 h-10 rounded-xl bg-teal-600 hover:bg-teal-700 text-white flex items-center justify-center shadow-sm hover:shadow transition-all disabled:opacity-40 disabled:cursor-not-allowed cursor-pointer shrink-0"
           >
             <Send className="w-4 h-4" />
           </button>

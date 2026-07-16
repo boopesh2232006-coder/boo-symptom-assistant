@@ -378,6 +378,127 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
   const [wizardAgeGroup, setWizardAgeGroup] = useState<string>("adult");
   const [wizardMatches, setWizardMatches] = useState<any[]>([]);
 
+  // Vitals Tracker state
+  interface VitalRecord {
+    timestamp: number;
+    temp: number;
+    hr: number;
+    sys: number;
+    dia: number;
+  }
+  const [vitalsHistory, setVitalsHistory] = useState<VitalRecord[]>([]);
+  const [inputTemp, setInputTemp] = useState("98.6");
+  const [inputHr, setInputHr] = useState("72");
+  const [inputSys, setInputSys] = useState("120");
+  const [inputDia, setInputDia] = useState("80");
+  const [vitalMetric, setVitalMetric] = useState<"temp" | "hr" | "bp">("temp");
+
+  // Load vitals on session change
+  useEffect(() => {
+    try {
+      const stored = localStorage.getItem(`boo_vitals_${session.id}`);
+      if (stored) {
+        setVitalsHistory(JSON.parse(stored));
+      } else {
+        setVitalsHistory([
+          { timestamp: Date.now() - 4 * 3600000, temp: 98.6, hr: 72, sys: 120, dia: 80 },
+          { timestamp: Date.now() - 3 * 3600000, temp: 99.1, hr: 78, sys: 122, dia: 82 },
+          { timestamp: Date.now() - 2 * 3600000, temp: 100.2, hr: 88, sys: 128, dia: 85 },
+          { timestamp: Date.now() - 1 * 3600000, temp: 101.5, hr: 95, sys: 135, dia: 88 }
+        ]);
+      }
+    } catch (e) {
+      console.error(e);
+    }
+  }, [session.id]);
+
+  const handleAddVital = () => {
+    const tempVal = parseFloat(inputTemp);
+    const hrVal = parseInt(inputHr);
+    const sysVal = parseInt(inputSys);
+    const diaVal = parseInt(inputDia);
+    
+    if (isNaN(tempVal) || isNaN(hrVal) || isNaN(sysVal) || isNaN(diaVal)) return;
+
+    const newRecord: VitalRecord = {
+      timestamp: Date.now(),
+      temp: tempVal,
+      hr: hrVal,
+      sys: sysVal,
+      dia: diaVal
+    };
+
+    const updated = [...vitalsHistory, newRecord];
+    setVitalsHistory(updated);
+    try {
+      localStorage.setItem(`boo_vitals_${session.id}`, JSON.stringify(updated));
+    } catch (e) {
+      console.error(e);
+    }
+  };
+
+  // Emergency Dispatch Simulator state
+  const [ambulanceETA, setAmbulanceETA] = useState(7);
+  useEffect(() => {
+    if (session.urgencyLevel !== "EMERGENCY") return;
+    const interval = setInterval(() => {
+      setAmbulanceETA((prev) => (prev > 1 ? prev - 1 : 1));
+    }, 45 * 1000);
+    return () => clearInterval(interval);
+  }, [session.urgencyLevel]);
+
+  // SVG Chart rendering helper
+  const renderSVGChart = (dataValues: number[], minVal: number, maxVal: number, color: string) => {
+    if (dataValues.length < 2) return (
+      <div className="h-20 flex items-center justify-center text-[10px] text-slate-400 italic">
+        Need at least 2 points to generate chart trends.
+      </div>
+    );
+    const width = 360;
+    const height = 80;
+    const padding = 10;
+    const range = maxVal - minVal || 1;
+    
+    const points = dataValues.map((val, index) => {
+      const x = padding + (index * (width - 2 * padding)) / (dataValues.length - 1);
+      const clampedVal = Math.min(maxVal, Math.max(minVal, val));
+      const y = height - padding - ((clampedVal - minVal) * (height - 2 * padding)) / range;
+      return `${x},${y}`;
+    }).join(" ");
+
+    return (
+      <svg className="w-full overflow-visible" height={height} viewBox={`0 0 ${width} ${height}`}>
+        <line x1={padding} y1={padding} x2={width - padding} y2={padding} className="stroke-slate-100 dark:stroke-slate-800" strokeWidth="1" strokeDasharray="3 3" />
+        <line x1={padding} y1={height / 2} x2={width - padding} y2={height / 2} className="stroke-slate-100 dark:stroke-slate-800" strokeWidth="1" strokeDasharray="3 3" />
+        <line x1={padding} y1={height - padding} x2={width - padding} y2={height - padding} className="stroke-slate-100 dark:stroke-slate-800" strokeWidth="1" strokeDasharray="3 3" />
+        <polyline
+          fill="none"
+          stroke={color}
+          strokeWidth="2.5"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+          points={points}
+        />
+        {dataValues.map((val, index) => {
+          const x = padding + (index * (width - 2 * padding)) / (dataValues.length - 1);
+          const clampedVal = Math.min(maxVal, Math.max(minVal, val));
+          const y = height - padding - ((clampedVal - minVal) * (height - 2 * padding)) / range;
+          return (
+            <circle
+              key={index}
+              cx={x}
+              cy={y}
+              r="4"
+              fill={color}
+              className="stroke-white dark:stroke-slate-900"
+              strokeWidth="2"
+            />
+          );
+        })}
+      </svg>
+    );
+  };
+
   useEffect(() => {
     if (wizardSymptoms.length === 0) {
       setWizardMatches([]);
@@ -619,6 +740,66 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
         </div>
         <p className="text-[11px] mt-1 opacity-90 leading-relaxed font-medium">{currentUrgency.desc}</p>
       </div>
+
+      {/* Emergency Ambulance Dispatch Simulator */}
+      {session.urgencyLevel === "EMERGENCY" && (
+        <div className="bg-rose-500/5 dark:bg-rose-950/10 border border-rose-500/15 m-4 p-4 rounded-2xl space-y-3.5">
+          <div className="flex items-center gap-2 text-rose-600 dark:text-rose-455">
+            <span className="w-2.5 h-2.5 rounded-full bg-rose-500 animate-ping" />
+            <h4 className="text-xs font-black uppercase tracking-wider">
+              Emergency Dispatch Active
+            </h4>
+          </div>
+          
+          <div className="space-y-2 text-xs">
+            <div className="flex justify-between items-center text-slate-700 dark:text-slate-200">
+              <span className="font-semibold text-slate-500">Ambulance ETA:</span>
+              <span className="font-mono font-bold text-rose-600 dark:text-rose-400 bg-rose-500/10 px-2 py-0.5 rounded border border-rose-500/10">{ambulanceETA} Minutes</span>
+            </div>
+            
+            {/* Live Progress Tracker */}
+            <div className="relative pl-4 border-l border-rose-200 dark:border-rose-900/60 space-y-3 pt-1">
+              <div className="relative">
+                <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 flex items-center justify-center text-[6px] text-white">✓</span>
+                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">Case Flagged & Logged (0m ago)</span>
+              </div>
+              <div className="relative">
+                <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 flex items-center justify-center text-[6px] text-white">✓</span>
+                <span className="text-[11px] font-bold text-slate-800 dark:text-slate-200">ER Dispatch Center Notified (1m ago)</span>
+              </div>
+              <div className="relative flex items-center gap-1.5">
+                <span className="absolute -left-[21.5px] top-1.5 w-2 h-2 rounded-full bg-rose-500 animate-pulse" />
+                <span className="text-[11px] font-bold text-rose-650 dark:text-rose-400">Ambulance In Transit (En Route)</span>
+              </div>
+              <div className="relative opacity-40">
+                <span className="absolute -left-[21px] top-0.5 w-2.5 h-2.5 rounded-full bg-slate-300 dark:bg-slate-700" />
+                <span className="text-[11px] font-bold text-slate-500">Hospital Arrival & Triage Admission</span>
+              </div>
+            </div>
+
+            {/* Panic Service Buttons */}
+            <div className="flex flex-wrap gap-2 pt-2">
+              <a
+                href="tel:911"
+                className="flex-1 bg-rose-600 hover:bg-rose-700 text-white font-bold text-[10px] py-2 px-3 rounded-xl transition-all shadow-sm shadow-rose-600/15 text-center flex items-center justify-center gap-1.5"
+              >
+                Call Emergency (911)
+              </a>
+              <button
+                type="button"
+                onClick={() => {
+                  if (setActiveTab) {
+                    setActiveTab("hospitals");
+                  }
+                }}
+                className="flex-1 bg-white hover:bg-slate-50 border border-slate-200 dark:bg-slate-900 dark:border-slate-800 text-slate-700 dark:text-slate-300 font-bold text-[10px] py-2 px-3 rounded-xl transition-all text-center flex items-center justify-center gap-1.5 cursor-pointer"
+              >
+                Locate Nearest ER
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Navigation Tabs */}
       <div className="flex border-b border-slate-100 dark:border-slate-800 bg-slate-50/50 dark:bg-slate-950/20 shrink-0">
@@ -1155,6 +1336,124 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
               {/* Symptom recovery diary */}
               <div className="border-t border-slate-150 dark:border-slate-800 pt-4 mt-2">
                 <SymptomTracker session={session} />
+              </div>
+
+              {/* Vitals Log & Trend Tracker */}
+              <div className="border-t border-slate-150 dark:border-slate-800 pt-4 mt-2 space-y-3">
+                <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                  Vitals Log & Trend Tracker
+                </h4>
+
+                {/* Vitals Inputs Form */}
+                <div className="bg-slate-50 dark:bg-slate-950 p-3 rounded-xl border border-slate-150 dark:border-slate-800/80 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-slate-400 uppercase block">Temp (°F)</label>
+                    <input
+                      type="text"
+                      value={inputTemp}
+                      onChange={(e) => setInputTemp(e.target.value)}
+                      className="w-full px-2 py-1 rounded bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-xs focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-slate-400 uppercase block">Heart Rate</label>
+                    <input
+                      type="text"
+                      value={inputHr}
+                      onChange={(e) => setInputHr(e.target.value)}
+                      className="w-full px-2 py-1 rounded bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-xs focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-slate-400 uppercase block">Sys BP</label>
+                    <input
+                      type="text"
+                      value={inputSys}
+                      onChange={(e) => setInputSys(e.target.value)}
+                      className="w-full px-2 py-1 rounded bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-xs focus:outline-none"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[8px] font-bold text-slate-400 uppercase block">Dia BP</label>
+                    <input
+                      type="text"
+                      value={inputDia}
+                      onChange={(e) => setInputDia(e.target.value)}
+                      className="w-full px-2 py-1 rounded bg-white dark:bg-slate-900 border border-slate-250 dark:border-slate-800 text-xs focus:outline-none"
+                    />
+                  </div>
+                  <button
+                    type="button"
+                    onClick={handleAddVital}
+                    className="col-span-2 sm:col-span-4 mt-1 bg-teal-600 hover:bg-teal-700 text-white font-bold text-[10px] py-1.5 px-3 rounded-lg cursor-pointer transition-all shadow-sm text-center"
+                  >
+                    Log Current Vitals
+                  </button>
+                </div>
+
+                {/* SVG Graph Selector Tabs */}
+                <div className="flex bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg text-[10px] font-bold">
+                  {(["temp", "hr", "bp"] as const).map((metric) => (
+                    <button
+                      key={metric}
+                      type="button"
+                      onClick={() => setVitalMetric(metric)}
+                      className={`py-1 rounded-md text-center flex-1 cursor-pointer transition-all ${
+                        vitalMetric === metric
+                          ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
+                          : "text-slate-500 hover:text-slate-700"
+                      }`}
+                    >
+                      {metric === "temp" ? "Temperature" : metric === "hr" ? "Heart Rate" : "Blood Pressure"}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Draw Selected Chart */}
+                <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800/80 p-3 rounded-xl overflow-hidden shadow-xs">
+                  {vitalMetric === "temp" && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[9px] font-bold text-slate-400">
+                        <span>Temperature Trend (°F)</span>
+                        <span className="text-teal-600">{vitalsHistory.length > 0 ? vitalsHistory[vitalsHistory.length - 1].temp.toFixed(1) : "--"}°F</span>
+                      </div>
+                      {renderSVGChart(vitalsHistory.map(v => v.temp), 96, 105, "#0d9488")}
+                    </div>
+                  )}
+
+                  {vitalMetric === "hr" && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[9px] font-bold text-slate-400">
+                        <span>Heart Rate Trend (BPM)</span>
+                        <span className="text-rose-600">{vitalsHistory.length > 0 ? vitalsHistory[vitalsHistory.length - 1].hr : "--"} BPM</span>
+                      </div>
+                      {renderSVGChart(vitalsHistory.map(v => v.hr), 50, 120, "#e11d48")}
+                    </div>
+                  )}
+
+                  {vitalMetric === "bp" && (
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[9px] font-bold text-slate-400">
+                        <span>Systolic / Diastolic Pressure (mmHg)</span>
+                        <span className="text-indigo-600">
+                          {vitalsHistory.length > 0 ? `${vitalsHistory[vitalsHistory.length - 1].sys}/${vitalsHistory[vitalsHistory.length - 1].dia}` : "--"} mmHg
+                        </span>
+                      </div>
+                      <div className="relative">
+                        <div className="absolute inset-0">
+                          {renderSVGChart(vitalsHistory.map(v => v.sys), 80, 160, "#4f46e5")}
+                        </div>
+                        <div className="relative mix-blend-multiply dark:mix-blend-screen opacity-70">
+                          {renderSVGChart(vitalsHistory.map(v => v.dia), 50, 110, "#3b82f6")}
+                        </div>
+                      </div>
+                      <div className="flex justify-center gap-4 text-[8px] font-bold text-slate-450 uppercase mt-1">
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-indigo-600 inline-block" /> Systolic</span>
+                        <span className="flex items-center gap-1"><span className="w-2 h-2 rounded-full bg-blue-500 inline-block" /> Diastolic</span>
+                      </div>
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </div>
