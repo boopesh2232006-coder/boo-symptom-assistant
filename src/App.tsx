@@ -2,10 +2,12 @@ import React, { useState, useEffect } from "react";
 import { ChatSession, Message } from "./types";
 import { ChatPanel } from "./components/ChatPanel";
 import { PatientCaseFile } from "./components/PatientCaseFile";
-import { Stethoscope, AlertTriangle, RefreshCw, LogOut, Settings as SettingsIcon } from "lucide-react";
+import { Stethoscope, AlertTriangle, RefreshCw, LogOut, Settings as SettingsIcon, Trash2 } from "lucide-react";
 import { TRANSLATIONS, LanguageCode } from "./lib/translations";
 import { WelcomePage } from "./components/WelcomePage";
 import { SettingsPanel } from "./components/SettingsPanel";
+import { AuthPage } from "./components/AuthPage";
+import { SplashPage } from "./components/SplashPage";
 
 const LOCAL_STORAGE_KEY = "boo_symptom_sessions";
 
@@ -32,6 +34,23 @@ const createNewBlankSession = (): ChatSession => {
 };
 
 export default function App() {
+  const [currentUser, setCurrentUser] = useState<{ name: string; email: string; picture?: string } | null>(() => {
+    try {
+      const stored = localStorage.getItem("boo_current_user");
+      return stored ? JSON.parse(stored) : null;
+    } catch {
+      return null;
+    }
+  });
+
+  const [showSplash, setShowSplash] = useState<boolean>(() => {
+    try {
+      return sessionStorage.getItem("boo_has_seen_splash") !== "true";
+    } catch {
+      return true;
+    }
+  });
+
   const [sessions, setSessions] = useState<ChatSession[]>([]);
   const [activeSessionId, setActiveSessionId] = useState<string>("");
   const [input, setInput] = useState<string>("");
@@ -316,6 +335,8 @@ export default function App() {
       localStorage.removeItem("boo_pref_language");
       localStorage.removeItem("boo_pref_textSize");
       localStorage.removeItem("boo_pref_theme");
+      localStorage.removeItem("boo_current_user");
+      sessionStorage.removeItem("boo_has_seen_splash");
     } catch (e) {
       console.error(e);
     }
@@ -324,11 +345,22 @@ export default function App() {
     setTextSize("md");
     setTheme("light");
     setShowWelcome(true);
+    setShowSplash(true);
+    setCurrentUser(null);
 
     const fresh = createNewBlankSession();
     setSessions([fresh]);
     setActiveSessionId(fresh.id);
     setConnectionError(null);
+  };
+
+  const handleSignOut = () => {
+    try {
+      localStorage.removeItem("boo_current_user");
+    } catch (e) {
+      console.error(e);
+    }
+    setCurrentUser(null);
   };
 
   const handleUpdateCoordinates = (lat: number, lng: number, address: string) => {
@@ -351,6 +383,38 @@ export default function App() {
     });
     saveSessions(updated);
   };
+
+  if (showSplash) {
+    return (
+      <SplashPage
+        theme={theme}
+        onEnter={() => {
+          setShowSplash(false);
+          try {
+            sessionStorage.setItem("boo_has_seen_splash", "true");
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+      />
+    );
+  }
+
+  if (!currentUser) {
+    return (
+      <AuthPage
+        theme={theme}
+        onLoginSuccess={(user) => {
+          setCurrentUser(user);
+          try {
+            localStorage.setItem("boo_current_user", JSON.stringify(user));
+          } catch (e) {
+            console.error(e);
+          }
+        }}
+      />
+    );
+  }
 
   if (showWelcome) {
     return (
@@ -408,6 +472,21 @@ export default function App() {
         </div>
 
         <div className="flex items-center gap-1.5 sm:gap-3">
+          {currentUser && (
+            <div className="flex items-center gap-2 border-r border-slate-100 dark:border-slate-800 pr-3 mr-1.5 sm:mr-3">
+              {currentUser.picture ? (
+                <img src={currentUser.picture} alt={currentUser.name} className="w-7 h-7 rounded-full object-cover border border-teal-500/20 shadow-sm" />
+              ) : (
+                <div className="w-7 h-7 rounded-full bg-teal-150 dark:bg-teal-900/50 text-teal-700 dark:text-teal-400 flex items-center justify-center font-bold text-xs">
+                  {currentUser.name.charAt(0).toUpperCase()}
+                </div>
+              )}
+              <span className="hidden sm:inline text-xs font-bold text-slate-700 dark:text-slate-200 truncate max-w-[100px]">
+                {currentUser.name}
+              </span>
+            </div>
+          )}
+
           {/* Settings option button */}
           <button
             onClick={() => setShowSettings(true)}
@@ -419,10 +498,19 @@ export default function App() {
 
           <button
             onClick={handleResetAll}
-            className="text-xs font-semibold text-slate-400 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors flex items-center gap-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 px-2.5 py-1.5 rounded-lg"
+            className="text-xs font-semibold text-slate-450 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400 transition-colors flex items-center gap-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 px-2.5 py-1.5 rounded-lg"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            {t.clearCaseLogs}
+          </button>
+
+          <button
+            onClick={handleSignOut}
+            className="text-xs font-semibold text-slate-450 hover:text-red-550 dark:text-slate-400 dark:hover:text-red-400 transition-colors flex items-center gap-1 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800 px-2.5 py-1.5 rounded-lg"
+            title="Sign Out"
           >
             <LogOut className="w-3.5 h-3.5" />
-            {t.clearCaseLogs}
+            <span className="hidden md:inline">Sign Out</span>
           </button>
         </div>
       </header>
