@@ -556,6 +556,7 @@ export default function App() {
               setActiveTab={setActiveTab}
               onUpdateSessions={saveSessions}
               language={language}
+              onSendMessage={handleSendMessage}
             />
           </div>
         </section>

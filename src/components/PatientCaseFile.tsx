@@ -29,7 +29,8 @@ import {
   Check,
   Pencil,
   Building2,
-  Printer
+  Printer,
+  Sparkles
 } from "lucide-react";
 
 interface PatientCaseFileProps {
@@ -43,6 +44,7 @@ interface PatientCaseFileProps {
   setActiveTab?: (tab: "chart" | "diagnosis" | "medicines" | "care" | "hospitals" | "history") => void;
   onUpdateSessions?: (updated: ChatSession[]) => void;
   language?: LanguageCode;
+  onSendMessage?: (customText?: string) => void;
 }
 
 interface MasterMedicine {
@@ -219,6 +221,114 @@ const MASTER_MEDICINE_DATABASE: MasterMedicine[] = [
   }
 ];
 
+interface SymptomDefinition {
+  id: string;
+  name: string;
+  category: "General" | "Respiratory" | "Digestive" | "Neurological" | "Cardiovascular";
+}
+
+const COMMON_SYMPTOMS: SymptomDefinition[] = [
+  { id: "fever", name: "Fever / Temperature", category: "General" },
+  { id: "fatigue", name: "Fatigue / Weakness", category: "General" },
+  { id: "chills", name: "Chills", category: "General" },
+  { id: "body_aches", name: "Body Aches / Muscle Pain", category: "General" },
+  
+  { id: "cough", name: "Cough", category: "Respiratory" },
+  { id: "sore_throat", name: "Sore Throat", category: "Respiratory" },
+  { id: "runny_nose", name: "Runny / Stuffy Nose", category: "Respiratory" },
+  { id: "shortness_of_breath", name: "Shortness of Breath", category: "Respiratory" },
+  
+  { id: "nausea", name: "Nausea / Vomiting", category: "Digestive" },
+  { id: "diarrhea", name: "Diarrhea", category: "Digestive" },
+  { id: "stomach_pain", name: "Abdominal / Stomach Pain", category: "Digestive" },
+  { id: "acid_reflux", name: "Heartburn / Acid Reflux", category: "Digestive" },
+  
+  { id: "headache", name: "Headache", category: "Neurological" },
+  { id: "dizziness", name: "Dizziness / Lightheadedness", category: "Neurological" },
+  { id: "confusion", name: "Confusion", category: "Neurological" },
+  
+  { id: "chest_pain", name: "Chest Pain", category: "Cardiovascular" },
+  { id: "palpitations", name: "Palpitations / Fast Heartbeat", category: "Cardiovascular" }
+];
+
+interface RuleCondition {
+  name: string;
+  symptoms: string[];
+  painRange: [number, number];
+  urgency: "LOW" | "MEDIUM" | "HIGH" | "EMERGENCY";
+  rationale: string;
+  complications: string;
+}
+
+const CLINICAL_RULES: RuleCondition[] = [
+  {
+    name: "Acute Gastroenteritis (Food Poisoning)",
+    symptoms: ["nausea", "diarrhea", "stomach_pain"],
+    painRange: [3, 8],
+    urgency: "MEDIUM",
+    rationale: "Matching digestive symptoms (nausea, diarrhea, stomach pain) typically suggest metabolic or gastrointestinal tract infections.",
+    complications: "Severe dehydration, electrolyte imbalance."
+  },
+  {
+    name: "Migraine Headache",
+    symptoms: ["headache", "nausea", "dizziness"],
+    painRange: [6, 10],
+    urgency: "HIGH",
+    rationale: "Unilateral or severe pulsing headache accompanied by nausea and dizziness corresponds to classic migraine aura/episodes.",
+    complications: "Chronic migraine progression, severe cognitive exhaustion."
+  },
+  {
+    name: "Upper Respiratory Infection (Common Cold)",
+    symptoms: ["cough", "sore_throat", "runny_nose", "fever"],
+    painRange: [1, 4],
+    urgency: "LOW",
+    rationale: "Cough, runny nose, sore throat, and low-grade fever are standard manifestations of common rhinovirus infections.",
+    complications: "Sinusitis, bronchitis, secondary middle ear infection."
+  },
+  {
+    name: "Influenza (Flu)",
+    symptoms: ["fever", "fatigue", "chills", "body_aches", "cough"],
+    painRange: [4, 7],
+    urgency: "MEDIUM",
+    rationale: "Abrupt onset of high fever, systemic muscle aches, extreme exhaustion, chills, and respiratory dry cough strongly align with Influenza.",
+    complications: "Pneumonia, respiratory failure, myocarditis."
+  },
+  {
+    name: "Potential Cardiovascular/Ischemic Event",
+    symptoms: ["chest_pain", "shortness_of_breath", "palpitations"],
+    painRange: [7, 10],
+    urgency: "EMERGENCY",
+    rationale: "🚨 EMERGENCY ALERT: Acute chest pain accompanied by dyspnea/shortness of breath represents high risk for myocardial ischemia or pulmonary embolism.",
+    complications: "Myocardial infarction, cardiac arrest, respiratory failure."
+  },
+  {
+    name: "Tension Headache",
+    symptoms: ["headache", "fatigue"],
+    painRange: [2, 5],
+    urgency: "LOW",
+    rationale: "Mild to moderate bilateral headache associated with muscle fatigue, typically originating from stress or sleep deprivation.",
+    complications: "Chronic daily headaches, severe sleep cycle disruption."
+  },
+  {
+    name: "Dehydration / Heat Exhaustion",
+    symptoms: ["dizziness", "fatigue", "headache", "nausea"],
+    painRange: [2, 6],
+    urgency: "MEDIUM",
+    rationale: "Dizziness, systemic weakness, headache, and secondary nausea point to electrolyte imbalance and low intravascular volume.",
+    complications: "Heat stroke, kidney damage, hypovolemic shock."
+  },
+  {
+    name: "Gastroesophageal Reflux Disease (GERD)",
+    symptoms: ["acid_reflux", "stomach_pain", "cough"],
+    painRange: [2, 5],
+    urgency: "LOW",
+    rationale: "Acid reflux and epigastric discomfort, sometimes inducing a dry cough due to vocal cord irritation by stomach acid.",
+    complications: "Esophagitis, esophageal stricture, Barrett's esophagus."
+  }
+];
+
+
+
 export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
   session,
   sessions,
@@ -230,6 +340,7 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
   setActiveTab: propSetActiveTab,
   onUpdateSessions,
   language = "en",
+  onSendMessage,
 }) => {
   const [localActiveTab, setLocalActiveTab] = useState<"chart" | "diagnosis" | "medicines" | "care" | "hospitals" | "history">("chart");
   const activeTab = propActiveTab !== undefined ? propActiveTab : localActiveTab;
@@ -257,6 +368,70 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
   const [countrySearchQuery, setCountrySearchQuery] = useState("");
 
   const data: ExtractedData = session.extractedData || {};
+
+  // Dynamic Symptom Matcher Wizard state
+  const [wizardSymptoms, setWizardSymptoms] = useState<string[]>([]);
+  const [wizardPainScale, setWizardPainScale] = useState<number>(5);
+  const [wizardDurationVal, setWizardDurationVal] = useState<number>(1);
+  const [wizardDurationUnit, setWizardDurationUnit] = useState<"hours" | "days" | "weeks">("days");
+  const [wizardSex, setWizardSex] = useState<string>("Unspecified");
+  const [wizardAgeGroup, setWizardAgeGroup] = useState<string>("adult");
+  const [wizardMatches, setWizardMatches] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (wizardSymptoms.length === 0) {
+      setWizardMatches([]);
+      return;
+    }
+
+    const matches: any[] = [];
+    CLINICAL_RULES.forEach((rule) => {
+      const common = rule.symptoms.filter((s) => wizardSymptoms.includes(s));
+      if (common.length > 0) {
+        const symptomRatio = common.length / rule.symptoms.length;
+        let painMultiplier = 1.0;
+        
+        const [minPain, maxPain] = rule.painRange;
+        if (wizardPainScale >= minPain && wizardPainScale <= maxPain) {
+          painMultiplier = 1.0;
+        } else {
+          const dist = Math.min(Math.abs(wizardPainScale - minPain), Math.abs(wizardPainScale - maxPain));
+          painMultiplier = Math.max(0.6, 1.0 - dist * 0.08);
+        }
+
+        const confidence = Math.round(symptomRatio * 90 * painMultiplier + (wizardSymptoms.length > rule.symptoms.length ? -5 : 0));
+        const finalConfidence = Math.min(98, Math.max(15, confidence));
+
+        if (finalConfidence >= 30) {
+          matches.push({
+            name: rule.name,
+            probabilityCategory: rule.urgency === "EMERGENCY" ? "High Probability" : rule.urgency === "HIGH" ? "High Probability" : rule.urgency === "MEDIUM" ? "Moderate Probability" : "Low Probability",
+            reasoning: rule.rationale,
+            supportingSymptoms: common.map((s) => COMMON_SYMPTOMS.find((cs) => cs.id === s)?.name || s),
+            conflictingSymptoms: rule.symptoms.filter((s) => !wizardSymptoms.includes(s)).map((s) => COMMON_SYMPTOMS.find((cs) => cs.id === s)?.name || s),
+            confidencePercentage: finalConfidence,
+            complicationsIfUntreated: rule.complications,
+            recommendedAction: rule.urgency === "EMERGENCY" ? "Seek emergency medical care immediately" : "Consult a healthcare provider"
+          });
+        }
+      }
+    });
+
+    matches.sort((a, b) => b.confidencePercentage - a.confidencePercentage);
+    setWizardMatches(matches);
+  }, [wizardSymptoms, wizardPainScale]);
+
+  const handleAnalyzeWithAI = () => {
+    if (!onSendMessage) return;
+    const list = wizardSymptoms.map((s) => COMMON_SYMPTOMS.find((cs) => cs.id === s)?.name || s).join(", ");
+    const genderStr = wizardSex !== "Unspecified" ? `Biological sex is ${wizardSex}.` : "";
+    const promptMessage = `I am experiencing the following symptoms: ${list}. The pain intensity is ${wizardPainScale}/10. This has been going on for ${wizardDurationVal} ${wizardDurationUnit}. ${genderStr} Please perform a dynamic clinical analysis and tell me possible conditions.`;
+    
+    if (setActiveTab) {
+      setActiveTab("chart");
+    }
+    onSendMessage(promptMessage);
+  };
 
   // Sync inputs with session's extractedData when session changes
   useEffect(() => {
@@ -1000,10 +1175,207 @@ export const PatientCaseFile: React.FC<PatientCaseFileProps> = ({
             </div>
 
             {session.possibleConditions.length === 0 ? (
-              <div className="text-center py-10 bg-slate-50 dark:bg-slate-950 rounded-xl border border-dashed border-slate-200 dark:border-slate-800">
-                <p className="text-xs text-slate-500 leading-relaxed max-w-xs mx-auto">
-                  Provide symptoms, pain scales, and timeline background to compile possible conditions dynamically.
-                </p>
+              <div className="bg-slate-50/40 dark:bg-slate-950/30 border border-slate-100 dark:border-slate-800 rounded-2xl p-5 space-y-6">
+                <div className="space-y-1">
+                  <h5 className="text-xs font-bold text-slate-800 dark:text-slate-200">
+                    Symptom Matcher & Case Builder
+                  </h5>
+                  <p className="text-[11px] text-slate-500 dark:text-slate-400">
+                    Build your clinical case parameters dynamically to compile suggestions and query BOO AI.
+                  </p>
+                </div>
+
+                {/* Biological Sex and Age group */}
+                <div className="grid grid-cols-2 gap-3.5">
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Biological Sex</label>
+                    <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg">
+                      {["Male", "Female", "Unspecified"].map((s) => (
+                        <button
+                          key={s}
+                          type="button"
+                          onClick={() => setWizardSex(s)}
+                          className={`text-[10px] font-bold py-1 px-1.5 rounded-md text-center transition-all cursor-pointer ${
+                            wizardSex === s
+                              ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
+                              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
+                          }`}
+                        >
+                          {s}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
+                  <div className="space-y-1.5">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Age Group</label>
+                    <div className="grid grid-cols-3 gap-1 bg-slate-100 dark:bg-slate-900 p-0.5 rounded-lg">
+                      {["Child", "Adult", "Senior"].map((a) => (
+                        <button
+                          key={a}
+                          type="button"
+                          onClick={() => setWizardAgeGroup(a.toLowerCase())}
+                          className={`text-[10px] font-bold py-1 px-1.5 rounded-md text-center transition-all cursor-pointer ${
+                            wizardAgeGroup === a.toLowerCase()
+                              ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
+                              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
+                          }`}
+                        >
+                          {a}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Timeline Duration */}
+                <div className="space-y-2">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Timeline Background (Duration)</label>
+                  <div className="flex gap-2">
+                    <input
+                      type="number"
+                      min={1}
+                      max={100}
+                      value={wizardDurationVal}
+                      onChange={(e) => setWizardDurationVal(Math.max(1, parseInt(e.target.value) || 1))}
+                      className="w-16 px-3 py-1.5 rounded-xl border border-slate-200 dark:border-slate-800 bg-transparent text-xs text-slate-900 dark:text-white focus:border-teal-500 focus:outline-none"
+                    />
+                    <div className="flex bg-slate-100 dark:bg-slate-900 p-0.5 rounded-xl flex-1">
+                      {["hours", "days", "weeks"].map((unit) => (
+                        <button
+                          key={unit}
+                          type="button"
+                          onClick={() => setWizardDurationUnit(unit as any)}
+                          className={`text-[10px] font-bold py-1.5 rounded-lg text-center flex-1 transition-all cursor-pointer ${
+                            wizardDurationUnit === unit
+                              ? "bg-white dark:bg-slate-800 text-teal-600 dark:text-teal-400 shadow-sm"
+                              : "text-slate-500 hover:text-slate-700 dark:hover:text-slate-350"
+                          }`}
+                        >
+                          {unit}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Pain Scale Selector */}
+                <div className="space-y-2">
+                  <div className="flex justify-between items-center">
+                    <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider">Pain Intensity Scale</label>
+                    <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 bg-teal-500/10 px-2 py-0.5 rounded">
+                      {wizardPainScale}/10 (
+                      {wizardPainScale <= 3 ? "Mild" : wizardPainScale <= 6 ? "Moderate" : wizardPainScale <= 8 ? "Severe" : "Critical"}
+                      )
+                    </span>
+                  </div>
+                  <input
+                    type="range"
+                    min={10}
+                    max={100}
+                    value={wizardPainScale * 10}
+                    onChange={(e) => setWizardPainScale(Math.round(parseInt(e.target.value) / 10))}
+                    className="w-full h-1.5 bg-slate-200 dark:bg-slate-850 rounded-lg appearance-none cursor-pointer accent-teal-600"
+                  />
+                  <div className="flex justify-between text-[9px] text-slate-400 font-semibold px-0.5">
+                    <span>1 (Very Mild)</span>
+                    <span>5 (Moderate)</span>
+                    <span>10 (Worst Pain)</span>
+                  </div>
+                </div>
+
+                {/* Symptoms Selector */}
+                <div className="space-y-2.5">
+                  <label className="text-[9px] font-bold text-slate-400 uppercase tracking-wider block">Reported Symptoms</label>
+                  
+                  {/* Render by Category */}
+                  {(["General", "Respiratory", "Digestive", "Neurological", "Cardiovascular"] as const).map((cat) => {
+                    const catSymptoms = COMMON_SYMPTOMS.filter((s) => s.category === cat);
+                    return (
+                      <div key={cat} className="space-y-1">
+                        <span className="text-[9px] font-bold text-slate-450 dark:text-slate-500 block pl-0.5">{cat}</span>
+                        <div className="flex flex-wrap gap-1.5">
+                          {catSymptoms.map((s) => {
+                            const isSelected = wizardSymptoms.includes(s.id);
+                            return (
+                              <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => {
+                                  if (isSelected) {
+                                    setWizardSymptoms(wizardSymptoms.filter((id) => id !== s.id));
+                                  } else {
+                                    setWizardSymptoms([...wizardSymptoms, s.id]);
+                                  }
+                                }}
+                                className={`text-[10px] font-semibold px-2.5 py-1 rounded-full border transition-all cursor-pointer ${
+                                  isSelected
+                                    ? "bg-teal-600 text-white border-teal-600 shadow-sm"
+                                    : "bg-white dark:bg-slate-900 border-slate-250 dark:border-slate-800 text-slate-700 dark:text-slate-350 hover:border-slate-300 dark:hover:border-slate-750"
+                                }`}
+                              >
+                                {s.name}
+                              </button>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                {/* Dynamic Suggestion Matches */}
+                {wizardMatches.length > 0 && (
+                  <div className="space-y-3 pt-3 border-t border-slate-100 dark:border-slate-800">
+                    <div className="flex items-center gap-1.5">
+                      <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                      <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                        Client-Side Dynamic Suggestions ({wizardMatches.length})
+                      </span>
+                    </div>
+                    
+                    <div className="space-y-1.5 max-h-48 overflow-y-auto pr-1">
+                      {wizardMatches.map((match, i) => (
+                        <div
+                          key={i}
+                          className="p-3 bg-white dark:bg-slate-900 border border-slate-150 dark:border-slate-800/80 rounded-xl flex items-start justify-between gap-3 shadow-xs hover:border-slate-300 dark:hover:border-slate-750 transition-all"
+                        >
+                          <div className="space-y-1 min-w-0">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <h6 className="text-[11px] font-bold text-slate-800 dark:text-slate-200 leading-tight">
+                                {match.name}
+                              </h6>
+                              <span className={`text-[8px] px-1 py-0.2 rounded font-bold uppercase tracking-wider leading-none border ${
+                                match.probabilityCategory === "High Probability"
+                                  ? "bg-rose-50 border-rose-100 text-rose-600 dark:bg-rose-950/20 dark:border-rose-900/40"
+                                  : "bg-amber-50 border-amber-100 text-amber-600 dark:bg-amber-950/20 dark:border-amber-900/40"
+                              }`}>
+                                {match.probabilityCategory}
+                              </span>
+                            </div>
+                            <p className="text-[10px] text-slate-500 dark:text-slate-400 leading-relaxed">
+                              {match.reasoning}
+                            </p>
+                          </div>
+                          
+                          <span className="text-[10px] font-bold text-teal-600 dark:text-teal-400 bg-teal-50 dark:bg-teal-950/40 px-2 py-0.5 rounded shrink-0">
+                            {match.confidencePercentage}% Match
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+
+                    {/* AI Query Button */}
+                    <button
+                      type="button"
+                      onClick={handleAnalyzeWithAI}
+                      className="w-full bg-gradient-to-r from-teal-600 to-emerald-500 hover:from-teal-700 hover:to-emerald-600 text-white font-bold text-xs py-3 px-4 rounded-xl shadow-md transition-all flex items-center justify-center gap-2 cursor-pointer hover:translate-y-0.5"
+                    >
+                      <Sparkles className="w-4 h-4 shrink-0" />
+                      <span>Sync & Analyze with BOO AI</span>
+                    </button>
+                  </div>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
