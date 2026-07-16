@@ -9,6 +9,102 @@ dotenv.config();
 const app = express();
 app.use(express.json());
 
+// 1. High-Performance Custom Security Headers Middleware (Helmet Alternative)
+app.use((req, res, next) => {
+  res.setHeader("X-Content-Type-Options", "nosniff");
+  res.setHeader("X-Frame-Options", "DENY");
+  res.setHeader("X-XSS-Protection", "1; mode=block");
+  res.setHeader("Referrer-Policy", "strict-origin-when-cross-origin");
+  res.setHeader("Strict-Transport-Security", "max-age=31536000; includeSubDomains; preload");
+  res.setHeader("Permissions-Policy", "geolocation=(self), camera=(), microphone=()");
+  // CSP allowing Google Sign-In script, Google Maps, Google Fonts, and images
+  res.setHeader(
+    "Content-Security-Policy",
+    "default-src 'self'; " +
+    "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://accounts.google.com/gsi/client https://maps.googleapis.com; " +
+    "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; " +
+    "font-src 'self' https://fonts.gstatic.com; " +
+    "img-src 'self' data: https://accounts.google.com https://images.unsplash.com https://lh3.googleusercontent.com https://maps.gstatic.com https://maps.googleapis.com; " +
+    "connect-src 'self' https://accounts.google.com https://maps.googleapis.com https://generativelanguage.googleapis.com; " +
+    "frame-src 'self' https://accounts.google.com; " +
+    "object-src 'none';"
+  );
+  next();
+});
+
+// 2. High-Performance Sliding Window Rate Limiter
+interface RateLimitRecord {
+  timestamps: number[];
+}
+const rateLimitMap = new Map<string, RateLimitRecord>();
+const LIMIT_WINDOW_MS = 60 * 1000; // 1 minute
+const MAX_REQUESTS = 60; // 60 requests/min
+
+// Run cleaner task every 5 minutes
+setInterval(() => {
+  const now = Date.now();
+  for (const [ip, record] of rateLimitMap.entries()) {
+    const validTimestamps = record.timestamps.filter((t) => now - t < LIMIT_WINDOW_MS);
+    if (validTimestamps.length === 0) {
+      rateLimitMap.delete(ip);
+    } else {
+      record.timestamps = validTimestamps;
+    }
+  }
+}, 5 * 60 * 1000);
+
+const rateLimiter = (req: express.Request, res: express.Response, next: express.NextFunction) => {
+  const ip = req.ip || (req.headers["x-forwarded-for"] as string) || "unknown-ip";
+  const now = Date.now();
+
+  let record = rateLimitMap.get(ip);
+  if (!record) {
+    record = { timestamps: [] };
+    rateLimitMap.set(ip, record);
+  }
+
+  record.timestamps = record.timestamps.filter((t) => now - t < LIMIT_WINDOW_MS);
+
+  if (record.timestamps.length >= MAX_REQUESTS) {
+    return res.status(429).json({
+      error: "Too Many Requests",
+      details: "Rate limit exceeded. Please try again in a minute.",
+    });
+  }
+
+  record.timestamps.push(now);
+  next();
+};
+
+// 3. Input Sanitization Helpers
+function sanitizeString(val: string): string {
+  if (typeof val !== "string") return val;
+  return val
+    .replace(/<script[^>]*>([\s\S]*?)<\/script>/gi, "")
+    .replace(/<[^>]+on[a-z]+=\s*['"]([^'"]*)['"]/gi, "")
+    .replace(/javascript:/gi, "");
+}
+
+function sanitizeInput(body: any): any {
+  if (!body) return body;
+  if (typeof body === "string") {
+    return sanitizeString(body);
+  }
+  if (Array.isArray(body)) {
+    return body.map((item) => sanitizeInput(item));
+  }
+  if (typeof body === "object") {
+    const sanitized: any = {};
+    for (const key in body) {
+      if (Object.prototype.hasOwnProperty.call(body, key)) {
+        sanitized[key] = sanitizeInput(body[key]);
+      }
+    }
+    return sanitized;
+  }
+  return body;
+}
+
 const PORT = 3000;
 
 // Initialize Google GenAI client securely on server side
@@ -46,9 +142,11 @@ CRITICAL OBJECTIVES:
 
 Always output your response in the requested structured JSON schema. Keep the 'message' formatted with clean markdown, utilizing bullet points or neat tables when appropriate.`;
 
-// Endpoint to process chat and clinical extraction
-app.post("/api/chat", async (req, res) => {
+// Endpoint to process chat and clinical extraction with high-performance security rate limiter
+app.post("/api/chat", rateLimiter, async (req, res) => {
   try {
+    // Sanitize incoming payloads against XSS/script injection
+    req.body = sanitizeInput(req.body);
     const { messages, patientState, language } = req.body;
 
     if (!messages || !Array.isArray(messages)) {
@@ -714,15 +812,27 @@ We are analyzing your symptoms with consideration of male-specific health factor
 // Setup Vite Dev Server / Static Hosting
 async function startServer() {
   if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { 
-        middlewareMode: true,
-        hmr: process.env.DISABLE_HMR !== 'true' ? { port: 0 } : false,
-      },
-      appType: "spa",
-    });
+    let vite;
+    try {
+      vite = await createViteServer({
+        server: { 
+          middlewareMode: true,
+          hmr: process.env.DISABLE_HMR !== 'true' ? { port: 0 } : false,
+        },
+        appType: "spa",
+      });
+    } catch (err: any) {
+      console.warn("⚠️ Port 24678 (Vite HMR) is busy. Initializing dev server with HMR disabled...");
+      vite = await createViteServer({
+        server: { 
+          middlewareMode: true,
+          hmr: false,
+        },
+        appType: "spa",
+      });
+    }
     app.use(vite.middlewares);
-    console.log("Vite development middleware mounted");
+    console.log("Vite development middleware mounted successfully");
   } else {
     const distPath = path.join(process.cwd(), "dist");
     app.use(express.static(distPath));
